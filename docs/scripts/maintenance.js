@@ -2,21 +2,21 @@
 
 /**
  * Documentation Maintenance Orchestrator
- * 
+ *
  * This script orchestrates all automated documentation maintenance tasks.
  */
 
-const fs = require('fs');
-const path = require('path');
-const config = require('../maintenance.config.js');
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import config from "../maintenance.config.js";
 
 // Import maintenance modules
-const CompletenessChecker = require('./check-completeness.js');
-const VersionSynchronizer = require('./sync-versions.js');
-const APIAccuracyTester = require('./test-api-accuracy.js');
-const ExamplesTester = require('./test-examples.js');
-const validateOpenAPI = require('./validate-openapi.js');
-const SchemaValidator = require('./validate-schemas.js');
+import CompletenessChecker from "./check-completeness.js";
+import VersionSynchronizer from "./sync-versions.js";
+import APIAccuracyTester from "./test-api-accuracy.js";
+import ExamplesTester from "./test-examples.js";
+import validateOpenAPI from "./validate-openapi.js";
+import SchemaValidator from "./validate-schemas.js";
 
 class DocumentationMaintenance {
   constructor(options = {}) {
@@ -25,7 +25,7 @@ class DocumentationMaintenance {
       skipTests: options.skipTests || false,
       forceRegenerate: options.forceRegenerate || false,
       verbose: options.verbose || false,
-      ...options
+      ...options,
     };
 
     this.results = {
@@ -34,14 +34,14 @@ class DocumentationMaintenance {
       versionSync: null,
       apiTesting: null,
       examplesTesting: null,
-      overall: 'pending'
+      overall: "pending",
     };
 
     this.startTime = Date.now();
   }
 
   async run() {
-    console.log('🚀 Starting documentation maintenance...');
+    console.log("🚀 Starting documentation maintenance...");
     console.log(`Configuration: ${JSON.stringify(this.options, null, 2)}\n`);
 
     try {
@@ -66,11 +66,10 @@ class DocumentationMaintenance {
       // Phase 6: Determine overall result
       this.determineOverallResult();
 
-      console.log('\n✅ Documentation maintenance completed successfully!');
-
+      console.log("\n✅ Documentation maintenance completed successfully!");
     } catch (error) {
-      console.error('\n❌ Documentation maintenance failed:', error.message);
-      this.results.overall = 'failed';
+      console.error("\n❌ Documentation maintenance failed:", error.message);
+      this.results.overall = "failed";
 
       if (this.options.verbose) {
         console.error(error.stack);
@@ -82,28 +81,29 @@ class DocumentationMaintenance {
   }
 
   async checkCompleteness() {
-    console.log('📋 Phase 1: Checking documentation completeness...');
+    console.log("📋 Phase 1: Checking documentation completeness...");
 
     try {
       const checker = new CompletenessChecker();
       await checker.check();
 
       this.results.completeness = {
-        status: 'passed',
+        status: "passed",
         errors: checker.errors.length,
         warnings: checker.warnings.length,
         details: {
           errors: checker.errors,
-          warnings: checker.warnings
-        }
+          warnings: checker.warnings,
+        },
       };
 
-      console.log(`✅ Completeness check passed (${checker.errors.length} errors, ${checker.warnings.length} warnings)`);
-
+      console.log(
+        `✅ Completeness check passed (${checker.errors.length} errors, ${checker.warnings.length} warnings)`,
+      );
     } catch (error) {
       this.results.completeness = {
-        status: 'failed',
-        error: error.message
+        status: "failed",
+        error: error.message,
       };
 
       console.log(`❌ Completeness check failed: ${error.message}`);
@@ -112,7 +112,7 @@ class DocumentationMaintenance {
   }
 
   async validateDocumentation() {
-    console.log('🔍 Phase 2: Validating documentation...');
+    console.log("🔍 Phase 2: Validating documentation...");
 
     try {
       // Validate OpenAPI specification
@@ -123,17 +123,16 @@ class DocumentationMaintenance {
       await schemaValidator.validate();
 
       this.results.validation = {
-        status: 'passed',
-        openapi: 'valid',
-        schemas: 'valid'
+        status: "passed",
+        openapi: "valid",
+        schemas: "valid",
       };
 
-      console.log('✅ Documentation validation passed');
-
+      console.log("✅ Documentation validation passed");
     } catch (error) {
       this.results.validation = {
-        status: 'failed',
-        error: error.message
+        status: "failed",
+        error: error.message,
       };
 
       console.log(`❌ Documentation validation failed: ${error.message}`);
@@ -142,24 +141,25 @@ class DocumentationMaintenance {
   }
 
   async synchronizeVersions() {
-    console.log('🔄 Phase 3: Synchronizing versions...');
+    console.log("🔄 Phase 3: Synchronizing versions...");
 
     try {
       const synchronizer = new VersionSynchronizer();
       await synchronizer.sync();
 
       this.results.versionSync = {
-        status: 'passed',
+        status: "passed",
         changes: synchronizer.changes.length,
-        details: synchronizer.changes
+        details: synchronizer.changes,
       };
 
-      console.log(`✅ Version synchronization completed (${synchronizer.changes.length} changes)`);
-
+      console.log(
+        `✅ Version synchronization completed (${synchronizer.changes.length} changes)`,
+      );
     } catch (error) {
       this.results.versionSync = {
-        status: 'failed',
-        error: error.message
+        status: "failed",
+        error: error.message,
       };
 
       console.log(`❌ Version synchronization failed: ${error.message}`);
@@ -168,17 +168,22 @@ class DocumentationMaintenance {
   }
 
   async testAPIAccuracy() {
-    console.log('🧪 Phase 4a: Testing API accuracy...');
+    console.log("🧪 Phase 4a: Testing API accuracy...");
 
     try {
       const tester = new APIAccuracyTester();
       await tester.test();
 
-      const passed = tester.testResults.filter(r => r.status === 'passed').length;
-      const failed = tester.testResults.filter(r => r.status === 'failed').length;
+      const passed = tester.testResults.filter(
+        (r) => r.status === "passed",
+      ).length;
+      const failed = tester.testResults.filter(
+        (r) => r.status === "failed",
+      ).length;
 
       this.results.apiTesting = {
-        status: failed === 0 && tester.errors.length === 0 ? 'passed' : 'failed',
+        status:
+          failed === 0 && tester.errors.length === 0 ? "passed" : "failed",
         total: tester.testResults.length,
         passed,
         failed,
@@ -187,20 +192,23 @@ class DocumentationMaintenance {
         details: {
           results: tester.testResults,
           errors: tester.errors,
-          warnings: tester.warnings
-        }
+          warnings: tester.warnings,
+        },
       };
 
-      if (this.results.apiTesting.status === 'passed') {
-        console.log(`✅ API accuracy testing passed (${passed}/${tester.testResults.length} tests)`);
+      if (this.results.apiTesting.status === "passed") {
+        console.log(
+          `✅ API accuracy testing passed (${passed}/${tester.testResults.length} tests)`,
+        );
       } else {
-        console.log(`❌ API accuracy testing failed (${failed} failed, ${tester.errors.length} errors)`);
+        console.log(
+          `❌ API accuracy testing failed (${failed} failed, ${tester.errors.length} errors)`,
+        );
       }
-
     } catch (error) {
       this.results.apiTesting = {
-        status: 'failed',
-        error: error.message
+        status: "failed",
+        error: error.message,
       };
 
       console.log(`❌ API accuracy testing failed: ${error.message}`);
@@ -210,17 +218,22 @@ class DocumentationMaintenance {
   }
 
   async testExamples() {
-    console.log('📝 Phase 4b: Testing code examples...');
+    console.log("📝 Phase 4b: Testing code examples...");
 
     try {
       const tester = new ExamplesTester();
       await tester.test();
 
-      const passed = tester.testResults.filter(r => r.status === 'passed').length;
-      const failed = tester.testResults.filter(r => r.status === 'failed').length;
+      const passed = tester.testResults.filter(
+        (r) => r.status === "passed",
+      ).length;
+      const failed = tester.testResults.filter(
+        (r) => r.status === "failed",
+      ).length;
 
       this.results.examplesTesting = {
-        status: failed === 0 && tester.errors.length === 0 ? 'passed' : 'failed',
+        status:
+          failed === 0 && tester.errors.length === 0 ? "passed" : "failed",
         total: tester.testResults.length,
         passed,
         failed,
@@ -229,20 +242,23 @@ class DocumentationMaintenance {
         details: {
           results: tester.testResults,
           errors: tester.errors,
-          warnings: tester.warnings
-        }
+          warnings: tester.warnings,
+        },
       };
 
-      if (this.results.examplesTesting.status === 'passed') {
-        console.log(`✅ Examples testing passed (${passed}/${tester.testResults.length} tests)`);
+      if (this.results.examplesTesting.status === "passed") {
+        console.log(
+          `✅ Examples testing passed (${passed}/${tester.testResults.length} tests)`,
+        );
       } else {
-        console.log(`❌ Examples testing failed (${failed} failed, ${tester.errors.length} errors)`);
+        console.log(
+          `❌ Examples testing failed (${failed} failed, ${tester.errors.length} errors)`,
+        );
       }
-
     } catch (error) {
       this.results.examplesTesting = {
-        status: 'failed',
-        error: error.message
+        status: "failed",
+        error: error.message,
       };
 
       console.log(`❌ Examples testing failed: ${error.message}`);
@@ -252,11 +268,11 @@ class DocumentationMaintenance {
   }
 
   async generateReports() {
-    console.log('📊 Phase 5: Generating reports...');
+    console.log("📊 Phase 5: Generating reports...");
 
-    const reportDir = path.join(__dirname, '..', this.config.reporting.outputDir);
-    if (!fs.existsSync(reportDir)) {
-      fs.mkdirSync(reportDir, { recursive: true });
+    const reportDir = join(__dirname, "..", this.config.reporting.outputDir);
+    if (!existsSync(reportDir)) {
+      mkdirSync(reportDir, { recursive: true });
     }
 
     const report = {
@@ -264,18 +280,18 @@ class DocumentationMaintenance {
       duration: Date.now() - this.startTime,
       config: this.options,
       results: this.results,
-      summary: this.generateSummary()
+      summary: this.generateSummary(),
     };
 
     // Generate JSON report
-    const jsonReportPath = path.join(reportDir, 'maintenance-report.json');
-    fs.writeFileSync(jsonReportPath, JSON.stringify(report, null, 2));
+    const jsonReportPath = join(reportDir, "maintenance-report.json");
+    writeFileSync(jsonReportPath, JSON.stringify(report, null, 2));
 
     // Generate HTML report
-    if (this.config.reporting.formats.includes('html')) {
-      const htmlReportPath = path.join(reportDir, 'maintenance-report.html');
+    if (this.config.reporting.formats.includes("html")) {
+      const htmlReportPath = join(reportDir, "maintenance-report.html");
       const htmlContent = this.generateHTMLReport(report);
-      fs.writeFileSync(htmlReportPath, htmlContent);
+      writeFileSync(htmlReportPath, htmlContent);
     }
 
     console.log(`📊 Reports generated in ${reportDir}`);
@@ -285,23 +301,23 @@ class DocumentationMaintenance {
     const summary = {
       overall: this.results.overall,
       phases: {
-        completeness: this.results.completeness?.status || 'skipped',
-        validation: this.results.validation?.status || 'skipped',
-        versionSync: this.results.versionSync?.status || 'skipped',
-        apiTesting: this.results.apiTesting?.status || 'skipped',
-        examplesTesting: this.results.examplesTesting?.status || 'skipped'
+        completeness: this.results.completeness?.status || "skipped",
+        validation: this.results.validation?.status || "skipped",
+        versionSync: this.results.versionSync?.status || "skipped",
+        apiTesting: this.results.apiTesting?.status || "skipped",
+        examplesTesting: this.results.examplesTesting?.status || "skipped",
       },
       metrics: {
         totalErrors: 0,
         totalWarnings: 0,
         totalTests: 0,
-        passedTests: 0
-      }
+        passedTests: 0,
+      },
     };
 
     // Calculate metrics
-    Object.values(this.results).forEach(result => {
-      if (result && typeof result === 'object') {
+    Object.values(this.results).forEach((result) => {
+      if (result && typeof result === "object") {
         summary.metrics.totalErrors += result.errors || 0;
         summary.metrics.totalWarnings += result.warnings || 0;
         summary.metrics.totalTests += result.total || 0;
@@ -314,7 +330,7 @@ class DocumentationMaintenance {
 
   generateHTMLReport(report) {
     const summary = report.summary;
-    const statusIcon = summary.overall === 'passed' ? '✅' : '❌';
+    const statusIcon = summary.overall === "passed" ? "✅" : "❌";
 
     return `
 <!DOCTYPE html>
@@ -365,16 +381,24 @@ class DocumentationMaintenance {
     </div>
 
     <h2>Phase Results</h2>
-    ${Object.entries(summary.phases).map(([phase, status]) => `
+    ${Object.entries(summary.phases)
+      .map(
+        ([phase, status]) => `
         <div class="phase">
             <h3><span class="status-${status}">${status.toUpperCase()}</span> ${phase.charAt(0).toUpperCase() + phase.slice(1)}</h3>
-            ${report.results[phase] ? `
+            ${
+              report.results[phase]
+                ? `
                 <div class="details">
                     <pre>${JSON.stringify(report.results[phase], null, 2)}</pre>
                 </div>
-            ` : ''}
+            `
+                : ""
+            }
         </div>
-    `).join('')}
+    `,
+      )
+      .join("")}
 
     <h2>Configuration</h2>
     <div class="details">
@@ -385,13 +409,13 @@ class DocumentationMaintenance {
   }
 
   determineOverallResult() {
-    const criticalPhases = ['completeness', 'validation'];
-    const testingPhases = ['apiTesting', 'examplesTesting'];
+    const criticalPhases = ["completeness", "validation"];
+    const testingPhases = ["apiTesting", "examplesTesting"];
 
     // Check critical phases
     for (const phase of criticalPhases) {
-      if (this.results[phase]?.status === 'failed') {
-        this.results.overall = 'failed';
+      if (this.results[phase]?.status === "failed") {
+        this.results.overall = "failed";
         return;
       }
     }
@@ -399,18 +423,18 @@ class DocumentationMaintenance {
     // Check testing phases (if not skipped)
     if (!this.options.skipTests) {
       for (const phase of testingPhases) {
-        if (this.results[phase]?.status === 'failed') {
+        if (this.results[phase]?.status === "failed") {
           // Testing failures are warnings, not critical failures
-          if (this.results.overall !== 'failed') {
-            this.results.overall = 'warning';
+          if (this.results.overall !== "failed") {
+            this.results.overall = "warning";
           }
         }
       }
     }
 
     // If no failures, mark as passed
-    if (this.results.overall === 'pending') {
-      this.results.overall = 'passed';
+    if (this.results.overall === "pending") {
+      this.results.overall = "passed";
     }
   }
 }
@@ -423,16 +447,16 @@ if (require.main === module) {
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case '--skip-tests':
+      case "--skip-tests":
         options.skipTests = true;
         break;
-      case '--force-regenerate':
+      case "--force-regenerate":
         options.forceRegenerate = true;
         break;
-      case '--verbose':
+      case "--verbose":
         options.verbose = true;
         break;
-      case '--help':
+      case "--help":
         console.log(`
 Documentation Maintenance Tool
 
@@ -458,4 +482,5 @@ Examples:
   maintenance.run().catch(console.error);
 }
 
-module.exports = DocumentationMaintenance;
+export default DocumentationMaintenance;
+

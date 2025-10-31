@@ -2,13 +2,14 @@
 
 /**
  * MCP (Model Context Protocol) Generator
- * 
+ *
  * This script generates MCP tool definitions and server implementation
  * for AI integration with the BugRelay backend.
  */
 
-const fs = require('fs');
-const path = require('path');
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 class MCPGenerator {
   constructor() {
@@ -17,164 +18,165 @@ class MCPGenerator {
   }
 
   async generate() {
-    console.log('Generating MCP documentation...');
-    
+    console.log("Generating MCP documentation...");
+
     await this.generateToolDefinitions();
     await this.generateServerImplementation();
     await this.writeToolDefinitions();
-    
-    console.log('MCP documentation generated successfully!');
+
+    console.log("MCP documentation generated successfully!");
   }
 
   async generateToolDefinitions() {
-    console.log('Generating MCP tool definitions...');
-    
+    console.log("Generating MCP tool definitions...");
+
     this.tools = [
       {
-        name: 'create_bug_report',
-        description: 'Create a new bug report in the BugRelay system',
+        name: "create_bug_report",
+        description: "Create a new bug report in the BugRelay system",
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             title: {
-              type: 'string',
-              description: 'Bug report title (max 255 characters)',
-              maxLength: 255
+              type: "string",
+              description: "Bug report title (max 255 characters)",
+              maxLength: 255,
             },
             description: {
-              type: 'string',
-              description: 'Detailed description of the bug'
+              type: "string",
+              description: "Detailed description of the bug",
             },
             application_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'UUID of the application where the bug was found'
+              type: "string",
+              format: "uuid",
+              description: "UUID of the application where the bug was found",
             },
             priority: {
-              type: 'string',
-              enum: ['low', 'medium', 'high', 'critical'],
-              description: 'Priority level of the bug',
-              default: 'medium'
+              type: "string",
+              enum: ["low", "medium", "high", "critical"],
+              description: "Priority level of the bug",
+              default: "medium",
             },
             operating_system: {
-              type: 'string',
-              description: 'Operating system where the bug occurred'
+              type: "string",
+              description: "Operating system where the bug occurred",
             },
             device_type: {
-              type: 'string',
-              description: 'Type of device (desktop, mobile, tablet)'
+              type: "string",
+              description: "Type of device (desktop, mobile, tablet)",
             },
             app_version: {
-              type: 'string',
-              description: 'Version of the application'
+              type: "string",
+              description: "Version of the application",
             },
             browser_version: {
-              type: 'string',
-              description: 'Browser version (if web application)'
-            }
+              type: "string",
+              description: "Browser version (if web application)",
+            },
           },
-          required: ['title', 'description', 'application_id']
-        }
+          required: ["title", "description", "application_id"],
+        },
       },
-      
+
       {
-        name: 'get_bug_report',
-        description: 'Retrieve a bug report by ID',
+        name: "get_bug_report",
+        description: "Retrieve a bug report by ID",
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             bug_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'UUID of the bug report to retrieve'
-            }
+              type: "string",
+              format: "uuid",
+              description: "UUID of the bug report to retrieve",
+            },
           },
-          required: ['bug_id']
-        }
+          required: ["bug_id"],
+        },
       },
-      
+
       {
-        name: 'search_bug_reports',
-        description: 'Search for bug reports with filters',
+        name: "search_bug_reports",
+        description: "Search for bug reports with filters",
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             query: {
-              type: 'string',
-              description: 'Search query for bug title and description'
+              type: "string",
+              description: "Search query for bug title and description",
             },
             status: {
-              type: 'string',
-              enum: ['open', 'reviewing', 'fixed', 'wont_fix'],
-              description: 'Filter by bug status'
+              type: "string",
+              enum: ["open", "reviewing", "fixed", "wont_fix"],
+              description: "Filter by bug status",
             },
             priority: {
-              type: 'string',
-              enum: ['low', 'medium', 'high', 'critical'],
-              description: 'Filter by priority level'
+              type: "string",
+              enum: ["low", "medium", "high", "critical"],
+              description: "Filter by priority level",
             },
             application_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'Filter by application ID'
+              type: "string",
+              format: "uuid",
+              description: "Filter by application ID",
             },
             limit: {
-              type: 'integer',
+              type: "integer",
               minimum: 1,
               maximum: 100,
               default: 20,
-              description: 'Maximum number of results to return'
+              description: "Maximum number of results to return",
             },
             offset: {
-              type: 'integer',
+              type: "integer",
               minimum: 0,
               default: 0,
-              description: 'Number of results to skip for pagination'
-            }
-          }
-        }
+              description: "Number of results to skip for pagination",
+            },
+          },
+        },
       },
-      
+
       {
-        name: 'authenticate_user',
-        description: 'Authenticate a user and obtain access token',
+        name: "authenticate_user",
+        description: "Authenticate a user and obtain access token",
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             email: {
-              type: 'string',
-              format: 'email',
-              description: 'User email address'
+              type: "string",
+              format: "email",
+              description: "User email address",
             },
             password: {
-              type: 'string',
-              description: 'User password'
-            }
+              type: "string",
+              description: "User password",
+            },
           },
-          required: ['email', 'password']
-        }
+          required: ["email", "password"],
+        },
       },
-      
+
       {
-        name: 'get_user_profile',
-        description: 'Get the current user profile information',
+        name: "get_user_profile",
+        description: "Get the current user profile information",
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             user_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'UUID of the user (optional, defaults to current user)'
-            }
-          }
-        }
-      }
+              type: "string",
+              format: "uuid",
+              description:
+                "UUID of the user (optional, defaults to current user)",
+            },
+          },
+        },
+      },
     ];
   }
 
   async generateServerImplementation() {
-    console.log('Generating MCP server implementation...');
-    
+    console.log("Generating MCP server implementation...");
+
     const serverCode = `#!/usr/bin/env python3
 """
 BugRelay MCP Server
@@ -388,24 +390,27 @@ if __name__ == "__main__":
     asyncio.run(main())
 `;
 
-    const serverPath = path.join(__dirname, '../mcp/server.py');
-    fs.writeFileSync(serverPath, serverCode);
+    const serverPath = join(__dirname, "../mcp/server.py");
+    writeFileSync(serverPath, serverCode);
     console.log(`MCP server implementation written to ${serverPath}`);
   }
 
   async writeToolDefinitions() {
-    const toolsPath = path.join(__dirname, '../mcp/tools.json');
+    const toolsPath = join(__dirname, "../mcp/tools.json");
     const toolsContent = JSON.stringify({ tools: this.tools }, null, 2);
-    
-    fs.writeFileSync(toolsPath, toolsContent);
+
+    writeFileSync(toolsPath, toolsContent);
     console.log(`MCP tool definitions written to ${toolsPath}`);
   }
 }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 // Run the generator
-if (require.main === module) {
+if (process.argv[1] === __filename) {
   const generator = new MCPGenerator();
   generator.generate().catch(console.error);
 }
 
-module.exports = MCPGenerator;
+export default MCPGenerator;
+
