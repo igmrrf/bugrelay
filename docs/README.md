@@ -55,6 +55,19 @@ features:
 
 BugRelay is a comprehensive bug tracking and reporting platform that enables users to submit bug reports, companies to manage their applications, and administrators to moderate content. The backend provides a robust REST API with authentication, file uploads, real-time features, and comprehensive admin tools.
 
+## 🚀 Quick Start
+
+**Documentation Server:** http://localhost:3001 (when running locally)
+
+```bash
+# Start the documentation server
+cd docs
+npm install
+npm run dev
+```
+
+The documentation includes interactive examples, complete API references, and step-by-step guides for integration and deployment.
+
 ## Key Features
 
 - **User Management**: Registration, authentication, and profile management

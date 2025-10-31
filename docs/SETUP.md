@@ -13,23 +13,38 @@ This guide explains how to set up and maintain the BugRelay backend documentatio
 1. **Install dependencies:**
    ```bash
    cd docs
-   make install
+   npm install
    ```
 
-2. **Generate documentation:**
+2. **Generate documentation (optional - basic docs already exist):**
    ```bash
-   make generate
+   npm run generate:all
    ```
 
 3. **Start development server:**
    ```bash
-   make dev
+   npm run dev
    ```
+   The documentation will be available at http://localhost:3001
 
 4. **Build for production:**
    ```bash
-   make build
+   npm run build
    ```
+
+## Current Status
+
+The documentation system is currently set up with:
+- ✅ VitePress configuration and basic structure
+- ✅ Homepage with feature overview
+- ✅ API reference landing page
+- ✅ Authentication guide with JWT/OAuth examples
+- ✅ Data models documentation
+- ✅ Deployment guide with Docker/Kubernetes
+- ✅ Quick start guide with code examples
+- 🔄 Auto-generation scripts (in development)
+- 🔄 OpenAPI specification generation
+- 🔄 JSON schema generation
 
 ## Directory Structure
 

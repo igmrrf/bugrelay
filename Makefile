@@ -12,6 +12,7 @@ help:
 	@echo "Development:"
 	@echo "  make dev-frontend    Start frontend development server"
 	@echo "  make dev-backend     Start backend development server"
+	@echo "  make dev-docs        Start documentation development server"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-up       Start all services with Docker"
@@ -21,12 +22,20 @@ help:
 	@echo "  make build           Build both frontend and backend"
 	@echo "  make build-frontend  Build frontend only"
 	@echo "  make build-backend   Build backend only"
+	@echo "  make build-docs      Build documentation site"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  make docs-setup      Install documentation dependencies"
+	@echo "  make docs-dev        Start documentation development server"
+	@echo "  make docs-generate   Generate API docs from codebase"
+	@echo "  make docs-validate   Validate generated documentation"
+	@echo "  make docs-test       Run documentation tests"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean           Clean build artifacts"
 
 # Setup commands
-setup: setup-frontend setup-backend
+setup: setup-frontend setup-backend docs-setup
 	@echo "✅ Setup complete!"
 
 setup-frontend:
@@ -46,6 +55,10 @@ dev-backend:
 	@echo "🚀 Starting backend development server..."
 	cd backend && go run main.go
 
+dev-docs:
+	@echo "📚 Starting documentation development server..."
+	cd docs && npm run dev
+
 # Docker commands
 docker-up:
 	@echo "🐳 Starting all services with Docker..."
@@ -56,7 +69,7 @@ docker-down:
 	docker-compose down
 
 # Build commands
-build: build-frontend build-backend
+build: build-frontend build-backend build-docs
 	@echo "✅ Build complete!"
 
 build-frontend:
@@ -66,6 +79,10 @@ build-frontend:
 build-backend:
 	@echo "🔨 Building backend..."
 	cd backend && go build -o bin/server main.go
+
+build-docs:
+	@echo "📚 Building documentation..."
+	cd docs && npm run build
 
 # Utility commands
 clean:
@@ -109,25 +126,21 @@ docs-setup:
 	@echo "📚 Setting up documentation..."
 	cd docs && npm install
 
-docs-build:
-	@echo "📚 Building documentation..."
-	cd docs && npm run build
-
-docs-dev:
-	@echo "📚 Starting documentation development server..."
-	cd docs && npm run dev
-
-docs-maintenance:
-	@echo "🔧 Running documentation maintenance..."
-	cd docs && npm run maintenance
-
-docs-test:
-	@echo "🧪 Testing documentation accuracy..."
-	cd docs && npm run test:coverage
+docs-generate:
+	@echo "📚 Generating documentation from codebase..."
+	cd docs && npm run generate:all
 
 docs-validate:
 	@echo "✅ Validating documentation..."
 	cd docs && npm run validate
+
+docs-test:
+	@echo "🧪 Testing documentation accuracy..."
+	cd docs && npm run test:comprehensive
+
+docs-maintenance:
+	@echo "🔧 Running documentation maintenance..."
+	cd docs && npm run maintenance
 
 docs-clean:
 	@echo "🧹 Cleaning documentation artifacts..."

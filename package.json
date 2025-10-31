@@ -1,0 +1,62 @@
+{
+  "name": "bugrelay",
+  "version": "1.0.0",
+  "description": "A modern, scalable bug tracking platform",
+  "private": true,
+  "scripts": {
+    "setup": "npm run setup:frontend && npm run setup:backend && npm run setup:docs",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:backend": "cd backend && go mod tidy",
+    "setup:docs": "cd docs && npm install",
+    
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:docs\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && go run main.go",
+    "dev:docs": "cd docs && npm run dev",
+    
+    "build": "npm run build:frontend && npm run build:backend && npm run build:docs",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && go build -o bin/server main.go",
+    "build:docs": "cd docs && npm run build",
+    
+    "test": "npm run test:frontend && npm run test:backend && npm run test:docs",
+    "test:frontend": "cd frontend && npm test",
+    "test:backend": "cd backend && go test ./...",
+    "test:docs": "cd docs && npm run test:comprehensive",
+    
+    "docs:dev": "cd docs && npm run dev",
+    "docs:build": "cd docs && npm run build",
+    "docs:generate": "cd docs && npm run generate:all",
+    "docs:validate": "cd docs && npm run validate",
+    "docs:test": "cd docs && npm run test:comprehensive",
+    
+    "clean": "rm -rf frontend/.next frontend/out backend/bin backend/tmp docs/.vitepress/dist docs/.vitepress/cache",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/bugrelay.git"
+  },
+  "keywords": [
+    "bug-tracking",
+    "issue-management",
+    "api",
+    "go",
+    "nextjs",
+    "typescript"
+  ],
+  "author": "BugRelay Team",
+  "license": "MIT"
+}
