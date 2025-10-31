@@ -1059,5 +1059,5 @@ receivers:
 - [Promtail Documentation](https://grafana.com/docs/loki/latest/clients/promtail/)
 - [LogQL Query Language](https://grafana.com/docs/loki/latest/logql/)
 - [Structured Logging Best Practices](https://www.honeycomb.io/blog/structured-logging-and-your-team/)
-- [Monitoring Guide](monitoring.md)
-- [Configuration Guide](configuration.md)
+- [Monitoring Guide](monitoring)
+- [Configuration Guide](configuration)

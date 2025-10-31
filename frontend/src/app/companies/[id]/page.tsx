@@ -3,12 +3,12 @@
 import { useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { MainLayout } from "@/components/layout"
-import { CompanyDashboard } from "@/components/companies/company-dashboard"
+import { CompanyDashboard, type CompanyDashboard as CompanyDashboardType } from "@/components/companies/company-dashboard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { LoadingState } from "@/components/ui/loading"
 import { ErrorMessage } from "@/components/ui/error-boundary"
-import { useCompany } from "@/lib/hooks/use-company-queries"
+import { useCompany, useCompanyBugs, useCompanyAnalytics, useCompanyApplications } from "@/lib/hooks/use-company-queries"
 import { useAuthStore } from "@/lib/stores/auth-store"
 import { Building2, CheckCircle, Bug, Users, Calendar, ExternalLink, Shield } from "lucide-react"
 import Link from "next/link"
@@ -19,11 +19,17 @@ export default function CompanyDetailPage() {
   const { user, isAuthenticated } = useAuthStore()
   const companyId = params.id as string
 
-  const { data: company, isLoading, error } = useCompany(companyId)
+  const { data: company, isLoading: companyLoading, error: companyError } = useCompany(companyId)
+  const { data: companyBugs, isLoading: bugsLoading } = useCompanyBugs(companyId, { limit: 5 })
+  const { data: companyStats } = useCompanyAnalytics(companyId)
+  const { data: companyApplications, isLoading: applicationsLoading } = useCompanyApplications(companyId)
+
+  const isLoading = companyLoading
+  const error = companyError
 
   // Check if user is a member of this company
-  const isCompanyMember = company?.teamMembers?.some(member => member.email === user?.email)
-  const userRole = company?.teamMembers?.find(member => member.email === user?.email)?.role
+  const isCompanyMember = company?.members?.some(member => member.user.email === user?.email)
+  const userRole = company?.members?.find(member => member.user.email === user?.email)?.role
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -48,7 +54,7 @@ export default function CompanyDetailPage() {
         <div className="container py-8">
           <ErrorMessage
             title="Failed to load company"
-            message={error}
+            message={error.message || 'An error occurred while loading the company'}
             action={{
               label: "Back to companies",
               onClick: () => router.push("/companies")
@@ -78,15 +84,55 @@ export default function CompanyDetailPage() {
 
   // If user is a company member, show the dashboard
   if (isAuthenticated && isCompanyMember) {
+    // Transform data for dashboard component
+    const dashboardData: CompanyDashboardType = {
+      id: company.id,
+      name: company.name,
+      domain: company.domain,
+      isVerified: company.isVerified,
+      createdAt: company.createdAt,
+      userRole: userRole || 'member',
+      stats: {
+        totalBugs: companyStats?.totalBugs || 0,
+        openBugs: companyStats?.openBugs || 0,
+        fixedBugs: companyStats?.resolvedBugs || 0,
+        avgResponseTime: companyStats?.responseMetrics?.avgResponseTime || 0,
+        monthlyTrend: 0 // Calculate from trends if available
+      },
+      applications: companyApplications?.map(app => ({
+        id: app.id,
+        name: app.name,
+        url: app.url,
+        bugCount: app.bugCount,
+        openBugCount: app.openBugCount,
+        lastBugAt: app.createdAt
+      })) || [],
+      teamMembers: company.members?.map(member => ({
+        id: member.id,
+        name: member.user.displayName,
+        email: member.user.email,
+        role: member.role,
+        avatar: member.user.avatarUrl,
+        joinedAt: member.addedAt,
+        lastActiveAt: member.addedAt // This would need to come from backend
+      })) || [],
+      recentBugs: companyBugs?.bugs?.map(bug => ({
+        id: bug.id,
+        title: bug.title,
+        status: bug.status as "open" | "reviewing" | "fixed" | "wont_fix",
+        priority: bug.priority as "low" | "medium" | "high" | "critical",
+        createdAt: bug.createdAt,
+        application: {
+          name: bug.application.name
+        },
+        reporter: undefined // This would need to come from backend
+      })) || []
+    }
+
     return (
       <MainLayout>
         <div className="container py-8">
-          <CompanyDashboard 
-            company={{
-              ...company,
-              userRole: userRole || 'member'
-            }}
-          />
+          <CompanyDashboard company={dashboardData} />
         </div>
       </MainLayout>
     )
@@ -152,9 +198,9 @@ export default function CompanyDetailPage() {
                 <Bug className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{company.stats?.totalBugs || company.bugCount || 0}</div>
+                <div className="text-2xl font-bold">{companyStats?.totalBugs || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  {company.stats?.openBugs || 0} currently open
+                  {companyStats?.openBugs || 0} currently open
                 </p>
               </CardContent>
             </Card>
@@ -165,7 +211,7 @@ export default function CompanyDetailPage() {
                 <ExternalLink className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{company.applications?.length || 0}</div>
+                <div className="text-2xl font-bold">{companyApplications?.length || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   Active applications
                 </p>
@@ -178,7 +224,7 @@ export default function CompanyDetailPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{company.teamMembers?.length || 0}</div>
+                <div className="text-2xl font-bold">{company.members?.length || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   {company.isVerified ? 'Team members' : 'Not verified'}
                 </p>
@@ -187,7 +233,7 @@ export default function CompanyDetailPage() {
           </div>
 
           {/* Applications */}
-          {company.applications && company.applications.length > 0 && (
+          {companyApplications && companyApplications.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Applications</CardTitle>
@@ -196,36 +242,42 @@ export default function CompanyDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {company.applications.map((app) => (
-                    <div key={app.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">{app.name}</h4>
-                        {app.url && (
-                          <Button variant="ghost" size="sm" asChild>
-                            <a href={app.url} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                {applicationsLoading ? (
+                  <div className="text-center py-4">
+                    <LoadingState message="Loading applications..." />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {companyApplications.map((app) => (
+                      <div key={app.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">{app.name}</h4>
+                          {app.url && (
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={app.url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>{app.bugCount || 0} bug reports</span>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/bugs?application=${app.id}`}>
+                              View Bugs
+                            </Link>
                           </Button>
-                        )}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{app.bugCount || 0} bug reports</span>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/bugs?application=${app.id}`}>
-                            View Bugs
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
           {/* Recent Bug Reports */}
-          {company.recentBugs && company.recentBugs.length > 0 && (
+          {companyBugs && companyBugs.bugs && companyBugs.bugs.length > 0 && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -237,31 +289,46 @@ export default function CompanyDetailPage() {
                   </div>
                   <Button variant="outline" asChild>
                     <Link href={`/bugs?company=${company.id}`}>
-                      View All
+                      View All ({companyBugs.totalCount})
                     </Link>
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {company.recentBugs.slice(0, 5).map((bug) => (
-                    <div key={bug.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{bug.title}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
-                          <span>{bug.application.name}</span>
-                          <span>{formatDate(bug.createdAt)}</span>
-                          {bug.reporter && <span>by {bug.reporter.name}</span>}
+                {bugsLoading ? (
+                  <div className="text-center py-4">
+                    <LoadingState message="Loading recent bugs..." />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {companyBugs.bugs.map((bug) => (
+                      <div key={bug.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{bug.title}</h4>
+                          <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
+                            <span>{bug.application.name}</span>
+                            <span>{formatDate(bug.createdAt)}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              bug.status === 'open' ? 'bg-red-100 text-red-800' :
+                              bug.status === 'reviewing' ? 'bg-yellow-100 text-yellow-800' :
+                              bug.status === 'fixed' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {bug.status}
+                            </span>
+                            <span>{bug.voteCount} votes</span>
+                            <span>{bug.commentCount} comments</span>
+                          </div>
                         </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/bugs/${bug.id}`}>
+                            View
+                          </Link>
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/bugs/${bug.id}`}>
-                          View
-                        </Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -296,8 +363,9 @@ export default function CompanyDetailPage() {
           )}
 
           {/* Empty State */}
-          {(!company.applications || company.applications.length === 0) && 
-           (!company.recentBugs || company.recentBugs.length === 0) && (
+          {(!companyApplications || companyApplications.length === 0) && 
+           (!companyBugs?.bugs || companyBugs.bugs.length === 0) && 
+           !applicationsLoading && !bugsLoading && (
             <Card>
               <CardContent className="text-center py-12">
                 <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

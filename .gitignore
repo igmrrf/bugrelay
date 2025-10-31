@@ -6,6 +6,7 @@ yarn-error.log*
 
 # Production builds
 /frontend/.next/
+/docs/.vitepress/dist
 /frontend/out/
 /backend/bin/
 /backend/tmp/

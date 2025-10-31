@@ -4,7 +4,7 @@ Welcome to the BugRelay guides section! This collection of tutorials and example
 
 ## Getting Started
 
-### 🚀 [Quick Start Guide](quick-start.md)
+### 🚀 [Quick Start Guide](quick-start)
 Get up and running with BugRelay in minutes. This guide covers:
 - Setting up your development environment
 - Making your first API calls
@@ -15,7 +15,7 @@ Get up and running with BugRelay in minutes. This guide covers:
 
 ## Integration Guides
 
-### 🔧 [Integration Examples](integration-examples.md)
+### 🔧 [Integration Examples](integration-examples)
 Comprehensive examples for different platforms and use cases:
 - **Web Applications**: React, Vue.js error boundaries and reporting widgets
 - **Mobile Apps**: React Native crash reporting and user feedback
@@ -25,7 +25,7 @@ Comprehensive examples for different platforms and use cases:
 
 **Perfect for**: Developers implementing BugRelay in production applications.
 
-### 🛠️ [Troubleshooting Guide](troubleshooting.md)
+### 🛠️ [Troubleshooting Guide](troubleshooting)
 Diagnose and resolve common issues:
 - Authentication problems
 - API request failures

@@ -836,5 +836,5 @@ docker-compose ps
 - [Grafana Documentation](https://grafana.com/docs/)
 - [Loki Documentation](https://grafana.com/docs/loki/)
 - [AlertManager Documentation](https://prometheus.io/docs/alerting/latest/alertmanager/)
-- [Configuration Guide](configuration.md)
-- [Troubleshooting Guide](../guides/troubleshooting.md)
+- [Configuration Guide](configuration)
+- [Troubleshooting Guide](../guides/troubleshooting)

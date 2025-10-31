@@ -15,7 +15,7 @@ export default function CompaniesPage() {
   const [filters, setFilters] = useState({
     search: '',
     verified: undefined as boolean | undefined,
-    sortBy: 'name' as 'name' | 'bugCount' | 'createdAt',
+    sortBy: 'name' as 'name' | 'bugs' | 'created',
     page: 1,
     limit: 12
   })
@@ -30,7 +30,7 @@ export default function CompaniesPage() {
     setFilters(prev => ({ ...prev, verified, page: 1 }))
   }
 
-  const handleSortChange = (sortBy: 'name' | 'bugCount' | 'createdAt') => {
+  const handleSortChange = (sortBy: 'name' | 'bugs' | 'created') => {
     setFilters(prev => ({ ...prev, sortBy, page: 1 }))
   }
 
@@ -102,16 +102,16 @@ export default function CompaniesPage() {
                   Name
                 </Button>
                 <Button
-                  variant={filters.sortBy === 'bugCount' ? "default" : "outline"}
+                  variant={filters.sortBy === 'bugs' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => handleSortChange('bugCount')}
+                  onClick={() => handleSortChange('bugs')}
                 >
                   Bug Count
                 </Button>
                 <Button
-                  variant={filters.sortBy === 'createdAt' ? "default" : "outline"}
+                  variant={filters.sortBy === 'created' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => handleSortChange('createdAt')}
+                  onClick={() => handleSortChange('created')}
                 >
                   Newest
                 </Button>
@@ -129,7 +129,7 @@ export default function CompaniesPage() {
         {error && (
           <ErrorMessage
             title="Failed to load companies"
-            message={error}
+            message={error.message || 'An error occurred while loading companies'}
             action={{
               label: "Try again",
               onClick: () => window.location.reload()
@@ -158,13 +158,13 @@ export default function CompaniesPage() {
                   
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Bug Reports</span>
-                      <span className="font-medium">{company.bugCount || 0}</span>
+                      <span className="text-muted-foreground">Team Members</span>
+                      <span className="font-medium">{company.members?.length || 0}</span>
                     </div>
                     
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Applications</span>
-                      <span className="font-medium">{company.applications?.length || 0}</span>
+                      <span className="text-muted-foreground">Status</span>
+                      <span className="font-medium">{company.isVerified ? 'Verified' : 'Unverified'}</span>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">

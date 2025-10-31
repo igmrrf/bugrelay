@@ -157,9 +157,9 @@ vote = bug_manager.vote_on_bug(new_bug['data']['id'], "up")
 
 For detailed examples in specific programming languages, see:
 
-- **[cURL Examples](curl-examples.md)** - Complete command-line examples for all endpoints
-- **[JavaScript/Node.js Examples](javascript-examples.md)** - Browser and Node.js integration examples
-- **[Python Examples](python-examples.md)** - Python client library and integration examples
+- **[cURL Examples](curl-examples)** - Complete command-line examples for all endpoints
+- **[JavaScript/Node.js Examples](javascript-examples)** - Browser and Node.js integration examples
+- **[Python Examples](python-examples)** - Python client library and integration examples
 
 ### JavaScript/Node.js
 

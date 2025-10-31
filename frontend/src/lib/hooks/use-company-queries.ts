@@ -213,3 +213,82 @@ export const useCompanyMembers = (companyId: string) => {
     }
   })
 }
+
+export const useCompanyBugs = (companyId: string, filters: {
+  status?: string[]
+  priority?: string[]
+  page?: number
+  limit?: number
+} = {}) => {
+  return useQuery({
+    queryKey: queryKeys.companies.bugs(companyId, filters),
+    queryFn: () => companiesAPI.getBugs(companyId, filters),
+    enabled: !!companyId,
+    staleTime: 2 * 60 * 1000, // 2 minutes for more frequent updates
+    meta: {
+      errorMessage: 'Failed to load company bugs'
+    }
+  })
+}
+
+export const useCompanyAnalytics = (companyId: string, timeRange: '7d' | '30d' | '90d' | '1y' = '30d') => {
+  return useQuery({
+    queryKey: [...queryKeys.companies.detail(companyId), 'analytics', timeRange],
+    queryFn: () => companiesAPI.getAnalytics(companyId, timeRange),
+    enabled: !!companyId,
+    staleTime: 10 * 60 * 1000, // 10 minutes for analytics
+    meta: {
+      errorMessage: 'Failed to load company analytics'
+    }
+  })
+}
+
+export const useCompanyApplications = (companyId: string) => {
+  return useQuery({
+    queryKey: [...queryKeys.companies.detail(companyId), 'applications'],
+    queryFn: () => companiesAPI.getApplications(companyId),
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+    meta: {
+      errorMessage: 'Failed to load company applications'
+    }
+  })
+}
+
+export const useUpdateBugStatus = () => {
+  const queryClient = useQueryClient()
+  const { addToast } = useUIStore()
+
+  return useMutation({
+    mutationFn: ({ 
+      companyId, 
+      bugId, 
+      status, 
+      response 
+    }: { 
+      companyId: string
+      bugId: string
+      status: 'open' | 'reviewing' | 'fixed' | 'wont_fix'
+      response?: string 
+    }) => companiesAPI.updateBugStatus(companyId, bugId, status, response),
+    onMutate: () => {
+      loadingManager.start('companies.bugs.update')
+    },
+    onSuccess: (data, { companyId }) => {
+      // Invalidate company bugs to refresh the list
+      queryClient.invalidateQueries({ queryKey: queryKeys.companies.bugs(companyId) })
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.companies.detail(companyId), 'analytics'] })
+      addToast({
+        title: 'Bug status updated',
+        description: data.message || 'Bug status has been updated successfully.',
+        type: 'success'
+      })
+    },
+    onError: (error) => {
+      errorHandler.handle(error, 'update bug status')
+    },
+    onSettled: () => {
+      loadingManager.stop('companies.bugs.update')
+    }
+  })
+}

@@ -92,7 +92,7 @@ Direct installation on servers for custom setups.
 
 ## Configuration
 
-All configuration is managed through environment variables and configuration files. For comprehensive configuration details, see the [Configuration Guide](configuration.md).
+All configuration is managed through environment variables and configuration files. For comprehensive configuration details, see the [Configuration Guide](configuration).
 
 ### Quick Configuration
 
@@ -133,7 +133,7 @@ GITHUB_CLIENT_ID=your_github_client_id
 RECAPTCHA_SECRET_KEY=your_recaptcha_secret
 ```
 
-For complete configuration options, security settings, and environment-specific configurations, see the [Configuration Guide](configuration.md).
+For complete configuration options, security settings, and environment-specific configurations, see the [Configuration Guide](configuration).
 
 ## Setup Guides
 
@@ -141,19 +141,19 @@ Choose the appropriate setup guide for your environment:
 
 ### Development Environment
 For local development with hot reloading and debugging tools:
-- **[Development Setup Guide](setup-development.md)** - Complete development environment setup
+- **[Development Setup Guide](setup-development)** - Complete development environment setup
 - Includes backend, frontend, database, and monitoring stack
 - Hot reloading, debugging tools, and test data
 
 ### Production Environment
 For production deployments with security and monitoring:
-- **[Production Setup Guide](setup-production.md)** - Production deployment guide
+- **[Production Setup Guide](setup-production)** - Production deployment guide
 - Multiple deployment options (Docker, Kubernetes, Cloud)
 - Security hardening, monitoring, and backup procedures
 
 ### Docker Deployment
 For containerized deployments using Docker and Docker Compose:
-- **[Docker Deployment Guide](docker.md)** - Comprehensive Docker guide
+- **[Docker Deployment Guide](docker)** - Comprehensive Docker guide
 - Development and production configurations
 - Scaling, monitoring, and troubleshooting
 
@@ -425,13 +425,13 @@ services:
 
 ### Monitoring Setup
 BugRelay includes a comprehensive monitoring stack with Prometheus, Grafana, and AlertManager:
-- **[Monitoring Guide](monitoring.md)** - Complete monitoring setup and configuration
+- **[Monitoring Guide](monitoring)** - Complete monitoring setup and configuration
 - Metrics collection, dashboards, and alerting
 - Performance monitoring and troubleshooting
 
 ### Logging Configuration
 Structured logging with Loki and Promtail for log aggregation:
-- **[Logging Guide](logging.md)** - Comprehensive logging configuration
+- **[Logging Guide](logging)** - Comprehensive logging configuration
 - Log formats, levels, and analysis
 - Security and audit logging
 
@@ -439,8 +439,8 @@ Structured logging with Loki and Promtail for log aggregation:
 
 After deployment:
 
-1. **[Configure Monitoring](monitoring.md)** - Set up dashboards and alerts
-2. **[Configure Logging](logging.md)** - Set up log aggregation and analysis
+1. **[Configure Monitoring](monitoring)** - Set up dashboards and alerts
+2. **[Configure Logging](logging)** - Set up log aggregation and analysis
 3. **[Set up Backup Procedures](#backup-and-recovery)** - Implement backup strategy
-4. **[Review Security Settings](../authentication/security.md)** - Harden security configuration
-5. **[Performance Optimization](monitoring.md#performance-monitoring)** - Optimize for production load
+4. **[Review Security Settings](../authentication/security)** - Harden security configuration
+5. **[Performance Optimization](monitoring#performance-monitoring)** - Optimize for production load

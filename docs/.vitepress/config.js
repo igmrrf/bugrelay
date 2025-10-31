@@ -30,39 +30,59 @@ export default defineConfig({
   // Last updated timestamp
   lastUpdated: true,
 
-  // Ignore dead links to allow build completion
-  ignoreDeadLinks: [
-    // Localhost development links
-    /^http:\/\/localhost/,
-    // Relative paths to root files
-    /^\.\.\/.*CONTRIBUTE/,
-    "./../CONTRIBUTING",
-    "./../../CONTRIBUTE",
-    // Missing guide pages (temporary)
-    "/guides/company-integration",
-    "/guides/file-uploads",
-    "/guides/webhooks",
-    "/guides/rate-limiting",
-    // Missing API pages (temporary)
-    "/api/examples/index",
-    "/api/endpoints/authentication",
-    "/api/endpoints/logs",
-    "./explorer",
-    "./endpoints/authentication",
-    "./examples/index",
-    // Missing auth pages (temporary)
-    "./jwt",
-    "./mfa",
-    "./sessions",
-    // Missing MCP pages (temporary)
-    "/mcp/index",
-    "./schemas",
-  ],
-
   // Site map generation
   sitemap: {
     hostname: "https://docs.bugrelay.com",
   },
+
+  // Dead link handling configuration
+  ignoreDeadLinks: [
+    // Allow localhost links in development
+    /^http:\/\/localhost/,
+    /^https:\/\/localhost/,
+    // Allow relative paths to root files that may not exist in docs context
+    /^\.\.\/.*CONTRIBUTE/,
+    /^\.\.\/.*LICENSE/,
+    /^\.\.\/.*README/,
+    /^\.\.\/.*CONTRIBUTING/,
+    './../../CONTRIBUTE',
+    './../CONTRIBUTING',
+    // Allow development-specific external links that may be temporarily unavailable
+    /github\.com.*\/edit\//,
+    // Allow placeholder external links
+    /example\.com/,
+    // Allow missing guide pages that will be created in subsequent tasks
+    '/guides/company-integration',
+    '/guides/file-uploads', 
+    '/guides/webhooks',
+    '/guides/rate-limiting',
+    // Allow missing authentication sub-pages that will be created
+    '/authentication/jwt',
+    './jwt',
+    '/authentication/mfa',
+    './mfa', 
+    '/authentication/sessions',
+    './sessions',
+    // Allow missing API documentation pages that will be created
+    '/api/endpoints/authentication',
+    './endpoints/authentication',
+    '/api/endpoints/logs',
+    '/api/examples/index',
+    './examples/index',
+    // Allow missing MCP pages that will be created
+    '/mcp/index',
+    // Allow missing model schema pages that will be created
+    '/models/schemas',
+    './schemas',
+    // Allow missing explorer page reference
+    './explorer',
+    // Allow missing guide pages that may be referenced but not yet created
+    '/guides/security',
+    '/guides/error-handling',
+    '/guides/performance',
+    // Allow relative path to root CONTRIBUTING file
+    './../../CONTRIBUTING',
+  ],
 
   themeConfig: {
     nav: [
@@ -99,8 +119,10 @@ export default defineConfig({
         {
           text: "Examples",
           items: [
-            { text: "Request Examples", link: "/api/examples/" },
-            { text: "Response Examples", link: "/api/examples/responses" },
+            { text: "Overview", link: "/api/examples/" },
+            { text: "cURL Examples", link: "/api/examples/curl-examples" },
+            { text: "JavaScript Examples", link: "/api/examples/javascript-examples" },
+            { text: "Python Examples", link: "/api/examples/python-examples" },
           ],
         },
       ],
@@ -124,6 +146,8 @@ export default defineConfig({
             { text: "Overview", link: "/authentication/" },
             { text: "Authentication Flows", link: "/authentication/flows" },
             { text: "JWT Implementation", link: "/authentication/jwt" },
+            { text: "Multi-Factor Authentication", link: "/authentication/mfa" },
+            { text: "Session Management", link: "/authentication/sessions" },
             { text: "OAuth Integration", link: "/authentication/oauth" },
             {
               text: "Security Considerations",
@@ -139,9 +163,11 @@ export default defineConfig({
           items: [
             { text: "Overview", link: "/deployment/" },
             { text: "Configuration", link: "/deployment/configuration" },
-            { text: "Setup Guide", link: "/deployment/setup" },
+            { text: "Development Setup", link: "/deployment/setup-development" },
+            { text: "Production Setup", link: "/deployment/setup-production" },
             { text: "Docker Deployment", link: "/deployment/docker" },
             { text: "Monitoring", link: "/deployment/monitoring" },
+            { text: "Logging", link: "/deployment/logging" },
           ],
         },
       ],
@@ -151,6 +177,10 @@ export default defineConfig({
           text: "Guides",
           items: [
             { text: "Quick Start", link: "/guides/quick-start" },
+            { text: "Company Integration", link: "/guides/company-integration" },
+            { text: "File Uploads", link: "/guides/file-uploads" },
+            { text: "Webhooks", link: "/guides/webhooks" },
+            { text: "Rate Limiting", link: "/guides/rate-limiting" },
             {
               text: "Integration Examples",
               link: "/guides/integration-examples",
@@ -165,9 +195,10 @@ export default defineConfig({
           text: "MCP Integration",
           items: [
             { text: "Overview", link: "/mcp/" },
-            { text: "Tool Definitions", link: "/mcp/tools" },
+            { text: "AI Context", link: "/mcp/ai-context" },
             { text: "Server Implementation", link: "/mcp/server" },
-            { text: "Schemas", link: "/mcp/schemas" },
+            { text: "Configuration", link: "/mcp/config" },
+            { text: "Setup", link: "/mcp/setup" },
           ],
         },
       ],

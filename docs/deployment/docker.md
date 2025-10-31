@@ -890,6 +890,6 @@ deploy:
 
 - [Docker Documentation](https://docs.docker.com/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Configuration Guide](configuration.md)
-- [Production Setup Guide](setup-production.md)
-- [Monitoring Documentation](monitoring.md)
+- [Configuration Guide](configuration)
+- [Production Setup Guide](setup-production)
+- [Monitoring Documentation](monitoring)

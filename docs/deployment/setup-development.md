@@ -589,8 +589,8 @@ After setting up the development environment:
 
 ## Additional Resources
 
-- [Configuration Guide](configuration.md)
-- [API Documentation](../api/README.md)
-- [Authentication Guide](../authentication/README.md)
-- [Troubleshooting Guide](../guides/troubleshooting.md)
-- [Contributing Guidelines](../../CONTRIBUTE.md)
+- [Configuration Guide](configuration)
+- [API Documentation](../api/)
+- [Authentication Guide](../authentication/)
+- [Troubleshooting Guide](../guides/troubleshooting)
+- [Contributing Guidelines](../../CONTRIBUTING)

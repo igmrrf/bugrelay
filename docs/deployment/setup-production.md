@@ -951,8 +951,8 @@ After production deployment:
 
 ## Additional Resources
 
-- [Configuration Guide](configuration.md)
-- [Monitoring Documentation](monitoring.md)
-- [Security Best Practices](../authentication/security.md)
-- [Troubleshooting Guide](../guides/troubleshooting.md)
-- [API Documentation](../api/README.md)
+- [Configuration Guide](configuration)
+- [Monitoring Documentation](monitoring)
+- [Security Best Practices](../authentication/security)
+- [Troubleshooting Guide](../guides/troubleshooting)
+- [API Documentation](../api/)
