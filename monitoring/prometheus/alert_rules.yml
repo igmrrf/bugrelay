@@ -1,0 +1,102 @@
+groups:
+  - name: bugrelay_alerts
+    rules:
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second"
+
+      # High Response Time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }} seconds"
+
+      # Database Connection Issues
+      - alert: DatabaseConnectionFailure
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection failure"
+          description: "PostgreSQL database is down"
+
+      # Redis Connection Issues
+      - alert: RedisConnectionFailure
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis connection failure"
+          description: "Redis cache is down"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full"
+
+      # Application Down
+      - alert: ApplicationDown
+        expr: up{job="bugrelay-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BugRelay backend is down"
+          description: "The BugRelay backend application is not responding"
+
+      # Security Alert - Too Many Failed Logins
+      - alert: TooManyFailedLogins
+        expr: increase(http_requests_total{path="/api/v1/auth/login",status="401"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many failed login attempts"
+          description: "{{ $value }} failed login attempts in the last 5 minutes"
+
+      # Rate Limiting Triggered
+      - alert: RateLimitingTriggered
+        expr: increase(http_requests_total{status="429"}[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limiting frequently triggered"
+          description: "{{ $value }} rate limit violations in the last 5 minutes"

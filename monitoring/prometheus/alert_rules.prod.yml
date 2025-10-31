@@ -1,0 +1,274 @@
+groups:
+  - name: bugrelay_production_alerts
+    rules:
+      # Critical Application Alerts
+      - alert: ApplicationDown
+        expr: up{job="bugrelay-backend-prod"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "BugRelay backend is down"
+          description: "The BugRelay backend application has been down for more than 1 minute"
+          runbook_url: "https://docs.bugrelay.com/runbooks/backend-down"
+
+      - alert: FrontendDown
+        expr: up{job="bugrelay-frontend-prod"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "BugRelay frontend is down"
+          description: "The BugRelay frontend application has been down for more than 2 minutes"
+
+      # High Error Rate Alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: HighClientErrorRate
+        expr: rate(http_requests_total{status=~"4.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High client error rate detected"
+          description: "Client error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Performance Alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s (threshold: 3s)"
+
+      - alert: CriticalResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical response time detected"
+          description: "95th percentile response time is {{ $value }}s (threshold: 10s)"
+
+      # Database Alerts
+      - alert: DatabaseConnectionFailure
+        expr: up{job="postgres-prod"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection failure"
+          description: "PostgreSQL database is unreachable"
+          runbook_url: "https://docs.bugrelay.com/runbooks/database-down"
+
+      - alert: DatabaseHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }}"
+
+      # Redis Alerts
+      - alert: RedisConnectionFailure
+        expr: up{job="redis-prod"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis connection failure"
+          description: "Redis cache is unreachable"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: CriticalMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"}) < 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      # Security Alerts
+      - alert: TooManyFailedLogins
+        expr: increase(http_requests_total{path="/api/v1/auth/login",status="401"}[5m]) > 20
+        for: 1m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Too many failed login attempts"
+          description: "{{ $value }} failed login attempts in the last 5 minutes"
+
+      - alert: SuspiciousActivity
+        expr: increase(http_requests_total{status="403"}[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "{{ $value }} forbidden requests in the last 5 minutes"
+
+      - alert: RateLimitingTriggered
+        expr: increase(http_requests_total{status="429"}[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limiting frequently triggered"
+          description: "{{ $value }} rate limit violations in the last 5 minutes"
+
+      # Container and Infrastructure Alerts
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%"
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}%"
+
+      - alert: ContainerRestarting
+        expr: increase(container_start_time_seconds{name!=""}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting"
+          description: "Container {{ $labels.name }} has restarted"
+
+      # SSL Certificate Alerts
+      - alert: SSLCertificateExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+
+      - alert: SSLCertificateExpired
+        expr: probe_ssl_earliest_cert_expiry - time() <= 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSL certificate expired"
+          description: "SSL certificate for {{ $labels.instance }} has expired"
+
+      # Monitoring System Alerts
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target down"
+          description: "{{ $labels.job }} target {{ $labels.instance }} is down"
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful != 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus configuration reload failed"
+          description: "Prometheus configuration reload has failed"
+
+      - alert: AlertmanagerDown
+        expr: up{job="alertmanager-prod"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager is down"
+          description: "Alertmanager has been down for more than 5 minutes"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana-prod"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana has been down for more than 5 minutes"

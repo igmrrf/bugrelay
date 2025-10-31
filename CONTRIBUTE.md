@@ -1,6 +1,6 @@
-# Contributing to BUGMIRROR
+# Contributing to BUGRELAY
 
-Thank you for considering contributing to **BUGMIRROR**! 🎉  
+Thank you for considering contributing to **BUGRELAY**! 🎉  
 This guide will help you set up your local environment, follow contribution standards, and make valuable pull requests.
 
 ---
@@ -12,8 +12,8 @@ Click "Fork" at the top-right of the GitHub page to create your copy.
 
 ### 2. Clone Your Fork
 ```bash
-git clone https://github.com/igmrrf/bugmirror.git
-cd bugmirror
+git clone https://github.com/igmrrf/bugrelay.git
+cd bugrelay
 ```
 
 ### 3. Create a Branch

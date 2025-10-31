@@ -1,0 +1,272 @@
+global:
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: 'alerts@bugrelay.com'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'severity', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 30m
+      routes:
+        # Database critical alerts
+        - match:
+            service: database
+          receiver: 'database-critical'
+        # Security critical alerts
+        - match:
+            category: security
+          receiver: 'security-critical'
+
+    # Warning alerts - less frequent notifications
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 2m
+      repeat_interval: 2h
+      routes:
+        # Security warnings
+        - match:
+            category: security
+          receiver: 'security-warnings'
+
+    # Monitoring system alerts
+    - match_re:
+        job: '(prometheus|alertmanager|grafana).*'
+      receiver: 'monitoring-alerts'
+
+receivers:
+  # Default receiver for unmatched alerts
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops-team@bugrelay.com'
+        subject: '[BugRelay] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ if .Annotations.runbook_url }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'ops-team@bugrelay.com,engineering@bugrelay.com'
+        subject: '🚨 [CRITICAL] BugRelay Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}
+          
+          📖 Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+          
+          This is a critical alert requiring immediate attention.
+        headers:
+          X-Priority: 'high'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: '🚨 Critical Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+
+    # PagerDuty integration for critical alerts
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INTEGRATION_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+
+  # Database critical alerts
+  - name: 'database-critical'
+    email_configs:
+      - to: 'dba-team@bugrelay.com,ops-team@bugrelay.com'
+        subject: '🗄️ [DATABASE CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🗄️ DATABASE CRITICAL ALERT 🗄️
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Database Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}
+          
+          📖 Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+          
+          Immediate database attention required!
+
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#database-alerts'
+        title: '🗄️ Database Critical: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Instance:* {{ .Labels.instance }}
+          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+
+  # Security critical alerts
+  - name: 'security-critical'
+    email_configs:
+      - to: 'security-team@bugrelay.com,ops-team@bugrelay.com'
+        subject: '🔒 [SECURITY CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🔒 SECURITY CRITICAL ALERT 🔒
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+          
+          Immediate security investigation required!
+
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        title: '🔒 Security Critical: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+
+  # Warning alerts
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'ops-team@bugrelay.com'
+        subject: '⚠️ [WARNING] BugRelay Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ WARNING ALERT ⚠️
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}
+          
+          📖 Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-warning'
+        title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+        send_resolved: true
+
+  # Security warnings
+  - name: 'security-warnings'
+    email_configs:
+      - to: 'security-team@bugrelay.com'
+        subject: '🔍 [SECURITY WARNING] {{ .GroupLabels.alertname }}'
+        body: |
+          🔍 SECURITY WARNING 🔍
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        title: '🔍 Security Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+
+  # Monitoring system alerts
+  - name: 'monitoring-alerts'
+    email_configs:
+      - to: 'ops-team@bugrelay.com'
+        subject: '📊 [MONITORING] {{ .GroupLabels.alertname }}'
+        body: |
+          📊 MONITORING SYSTEM ALERT 📊
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.job }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+inhibit_rules:
+  # Inhibit warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service', 'instance']
+
+  # Inhibit individual service alerts when the whole application is down
+  - source_match:
+      alertname: 'ApplicationDown'
+    target_match_re:
+      alertname: '(HighErrorRate|HighResponseTime|DatabaseConnectionFailure)'
+    equal: ['instance']
+
+  # Inhibit container alerts when the node is down
+  - source_match_re:
+      alertname: '(NodeDown|InstanceDown)'
+    target_match_re:
+      alertname: 'Container.*'
+    equal: ['instance']

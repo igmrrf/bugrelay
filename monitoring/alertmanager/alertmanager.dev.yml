@@ -1,0 +1,82 @@
+global:
+  smtp_smarthost: 'mailhog:1025'
+  smtp_from: 'alerts@bugrelay-dev.local'
+  smtp_require_tls: false
+
+route:
+  group_by: ['alertname', 'environment']
+  group_wait: 5s
+  group_interval: 5s
+  repeat_interval: 30m
+  receiver: 'development-alerts'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-dev-alerts'
+      group_wait: 1s
+      repeat_interval: 5m
+    - match:
+        severity: warning
+      receiver: 'warning-dev-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+
+receivers:
+  - name: 'development-alerts'
+    email_configs:
+      - to: 'dev-team@bugrelay-dev.local'
+        subject: '[DEV] {{ .GroupLabels.alertname }}'
+        body: |
+          Development Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Environment: Development
+          Severity: {{ .Labels.severity }}
+          {{ end }}
+        headers:
+          X-Environment: 'development'
+
+  - name: 'critical-dev-alerts'
+    email_configs:
+      - to: 'dev-team@bugrelay-dev.local'
+        subject: '[DEV CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL Development Alert 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Environment: Development
+          Severity: {{ .Labels.severity }}
+          
+          This is a critical alert in the development environment.
+          Please investigate immediately.
+          {{ end }}
+        headers:
+          X-Priority: 'high'
+          X-Environment: 'development'
+
+  - name: 'warning-dev-alerts'
+    email_configs:
+      - to: 'dev-team@bugrelay-dev.local'
+        subject: '[DEV WARNING] {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ Warning Development Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Environment: Development
+          Severity: {{ .Labels.severity }}
+          {{ end }}
+        headers:
+          X-Environment: 'development'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'environment', 'instance']

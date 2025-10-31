@@ -1,7 +1,7 @@
-# BUGMIRROR Product Requirements Document (PRD)
+# BUGRELAY Product Requirements Document (PRD)
 
 ## 🧭 Overview
-**BUGMIRROR** is a public, user-driven bug tracking hub. Users report bugs they find in any app; companies can claim and respond. The MVP focuses on open bug submission, browsing, and company verification.
+**BUGRELAY** is a public, user-driven bug tracking hub. Users report bugs they find in any app; companies can claim and respond. The MVP focuses on open bug submission, browsing, and company verification and bug status management.
 
 ---
 
@@ -30,38 +30,45 @@
 ## 🧩 Core Features (MVP v1.0)
 
 ### 1. Bug Submission
-- Fields: Title, description, screenshots, optional tech info (OS, device, version).
-- App name / URL association.
-- Optional contact email.
-- Publicly visible bug list.
+- **Core Fields**: Title, description, screenshots, optional technical information (OS, device, version)
+- **App Association**: Application name or URL linking
+- **Contact**: Optional email collection
+- **Visibility**: All bug reports publicly visible by default
+- **Security**: Anti-spam measures including reCAPTCHA and rate-limiting
 
 ### 2. User Authentication
-- OAuth (Google, GitHub, email/password)
-- Required for claiming a company or commenting/upvoting bugs.
+- **OAuth Support**: Google and GitHub authentication
+- **Traditional Auth**: Email and password option
+- **Access Control**: Required for claiming companies, commenting, and upvoting
+- **Anonymous Submission**: Bug reports can be submitted without authentication
+- **Session Security**: Secure session management for authenticated users
 
-### 3. Company Claiming
-- Company page auto-created when a bug mentions that app/company.
-- Verification flow via company domain email (`@company.com`).
-- After verification, company user can:
-  - Update bug status (`open`, `reviewing`, `fixed`, `won’t fix`)
-  - Respond to bugs
-  - Add teammates
+### 3. Company Management
+- **Auto-Creation**: Company pages automatically created when bugs mention new applications
+- **Verification Flow**: Domain email verification (`@company.com`) for ownership claims
+- **Status Management**: Update bug status (open, reviewing, fixed, won't fix)
+- **Response System**: Add responses and communicate with bug reporters
+- **Team Management**: Add team members after verification
+- **Access Control**: Bug management restricted to verified company users only
 
-### 4. Bug Browsing & Filters
-- Search & filter by:
-  - App/company name
-  - Status
-  - Tags (UI, crash, performance, security)
-- Sorting: most recent, most upvoted, trending.
+### 4. Bug Browsing & Interaction
+- **Search & Filter**: By application name, company name, status, and tags (UI, crash, performance, security)
+- **Sorting**: Most recent, most upvoted, trending
+- **User Engagement**: Upvoting and commenting (requires authentication)
+- **Anonymous Access**: Browse and view bug reports without authentication
 
-### 5. User Feedback
-- Upvote bugs ("I also have this issue").
-- Comment thread per bug.
+### 5. Administrative Features
+- **Content Moderation**: Flag and remove inappropriate bug reports
+- **Duplicate Management**: Merge duplicate bug reports
+- **Spam Control**: Manual spam management tools
+- **Audit Trail**: Maintain logs of all administrative actions
+- **Dashboard**: Centralized admin interface for platform management
 
-### 6. Admin Dashboard (Internal)
-- Moderate spam
-- Merge duplicates
-- Flag or remove inappropriate reports
+### 6. Data & Security
+- **Public Data**: All bug reports public by default
+- **Verification**: Company claims verified via domain email only
+- **Privacy**: No sensitive personal data required
+- **History Tracking**: Maintain history of status changes and responses
 
 ---
 
@@ -72,9 +79,10 @@
 | **Frontend** | Next.js 15 (React, App Router) | SSR for SEO, performance, and future portability. |
 | **UI** | TailwindCSS + Shadcn/UI | Rapid, consistent UI dev. |
 | **State Management** | Zustand / TanStack Query | Lightweight, modern data flow. |
-| **Backend** | NestJS (Node.js + TypeScript) | Structured, scalable backend. |
-| **Database** | PostgreSQL (Prisma ORM) | Reliable relational model. |
-| **Auth** | Clerk / Supabase Auth / NextAuth | Simplified user management. |
+| **Backend** | Go (Gin) | Structured, scalable backend. |
+| **Database** | PostgreSQL | Reliable relational model. |
+| **Caching** | Redis  | Fast in memory |
+| **Auth** | Custom JWT + OAuth Integration | Secure authentication with Google/GitHub OAuth support. |
 | **Storage** | AWS S3 / Supabase Storage | File storage for screenshots. |
 | **Search** | PostgreSQL full-text search or Meilisearch | Fast lookup. |
 | **Hosting** | Vercel (frontend), Railway/Render (backend) | Quick deployment and scaling. |
@@ -97,18 +105,19 @@
 
 ## 👥 User Stories
 
-### Reporter
-- As a user, I can submit a bug with screenshots.
-- As a user, I can browse bugs for a specific app.
-- As a user, I can upvote or comment on a bug.
+### Bug Reporter
+- As a Bug Reporter, I want to submit detailed bug reports with screenshots, so that I can help improve applications I use.
+- As a Bug Reporter, I want to browse and interact with existing bug reports, so that I can find similar issues and show support for fixes.
 
-### Company
-- As a company user, I can claim ownership using my company email.
-- As a company user, I can change bug statuses or respond to users.
+### Company User
+- As a Company User, I want to claim ownership of my company's applications, so that I can manage and respond to bug reports.
+- As a Company User, I want to manage bug report statuses and responses, so that I can communicate progress to users.
 
-### Admin
-- As an admin, I can flag or remove spam bugs.
-- As an admin, I can merge duplicates.
+### Admin User
+- As an Admin User, I want to moderate content and manage the platform, so that I can maintain quality and prevent abuse.
+
+### Any User
+- As any user, I want secure authentication options, so that I can safely access platform features.
 
 ---
 
@@ -125,14 +134,14 @@
 ```
 Frontend (Next.js)
     ↓
-Backend (NestJS API)
+Backend (Gin)
     ↓
 PostgreSQL (via Prisma)
     ↓
 S3 / Supabase (file storage)
 ```
 
-Auth: Clerk / NextAuth  
+Auth: Custom JWT with OAuth  
 Search: Native SQL FTS or Meilisearch (optional)  
 CI/CD: GitHub Actions → Vercel + Railway Deploy
 
