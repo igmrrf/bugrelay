@@ -1,0 +1,70 @@
+{
+  "tools": [
+    {
+      "name": "initiate_oauth_login",
+      "description": "Initiate OAuth authentication flow with supported providers",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["google", "github"],
+            "description": "OAuth provider to use for authentication"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "format": "uri",
+            "description": "URI to redirect to after OAuth completion"
+          },
+          "state": {
+            "type": "string",
+            "description": "Optional state parameter for CSRF protection"
+          }
+        },
+        "required": ["provider"]
+      }
+    },
+    {
+      "name": "handle_oauth_callback",
+      "description": "Handle OAuth callback and complete authentication",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["google", "github"],
+            "description": "OAuth provider that sent the callback"
+          },
+          "code": {
+            "type": "string",
+            "description": "Authorization code from OAuth provider"
+          },
+          "state": {
+            "type": "string",
+            "description": "State parameter for CSRF validation"
+          }
+        },
+        "required": ["provider", "code"]
+      }
+    },
+    {
+      "name": "link_oauth_account",
+      "description": "Link an OAuth account to an existing user account (requires authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["google", "github"],
+            "description": "OAuth provider to link"
+          },
+          "code": {
+            "type": "string",
+            "description": "Authorization code from OAuth provider"
+          }
+        },
+        "required": ["provider", "code"]
+      }
+    }
+  ]
+}

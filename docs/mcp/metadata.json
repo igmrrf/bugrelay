@@ -1,0 +1,300 @@
+{
+  "api_metadata": {
+    "name": "BugRelay Backend API",
+    "version": "1.0.0",
+    "description": "A comprehensive bug tracking and reporting system with user authentication, company verification, and administrative features",
+    "base_url": "http://localhost:8080/api/v1",
+    "documentation_url": "https://docs.bugrelay.com",
+    "support_email": "support@bugrelay.com"
+  },
+  "capabilities": {
+    "bug_management": {
+      "description": "Create, read, update, and manage bug reports",
+      "features": [
+        "Anonymous bug submission with reCAPTCHA",
+        "Authenticated bug submission",
+        "Bug voting system",
+        "Comment system",
+        "File attachments",
+        "Status management",
+        "Priority levels",
+        "Tag-based categorization",
+        "Search and filtering"
+      ],
+      "supported_operations": [
+        "create",
+        "read",
+        "update",
+        "list",
+        "vote",
+        "comment",
+        "attach_files"
+      ]
+    },
+    "user_authentication": {
+      "description": "User registration, authentication, and profile management",
+      "features": [
+        "Email/password registration",
+        "JWT-based authentication",
+        "Email verification",
+        "Password reset",
+        "OAuth integration (Google, GitHub)",
+        "Profile management",
+        "Session management"
+      ],
+      "supported_providers": [
+        "email",
+        "google",
+        "github"
+      ]
+    },
+    "company_management": {
+      "description": "Company verification and team management",
+      "features": [
+        "Company registration",
+        "Domain-based verification",
+        "Team member management",
+        "Company dashboard",
+        "Bug assignment to companies",
+        "Company response system"
+      ],
+      "verification_methods": [
+        "email_domain",
+        "dns_txt_record"
+      ]
+    },
+    "administration": {
+      "description": "Administrative functions for system management",
+      "features": [
+        "Bug moderation",
+        "User management",
+        "Audit logging",
+        "System statistics",
+        "Content flagging",
+        "Duplicate bug merging"
+      ],
+      "access_control": "admin_role_required"
+    }
+  },
+  "data_models": {
+    "bug_report": {
+      "description": "Represents a bug report in the system",
+      "primary_key": "id",
+      "required_fields": ["title", "description", "application_id"],
+      "optional_fields": [
+        "priority",
+        "tags",
+        "operating_system",
+        "device_type",
+        "app_version",
+        "browser_version",
+        "reporter_id"
+      ],
+      "relationships": {
+        "reporter": "user (optional)",
+        "application": "application (required)",
+        "assigned_company": "company (optional)",
+        "votes": "bug_vote (one-to-many)",
+        "comments": "comment (one-to-many)",
+        "attachments": "file_attachment (one-to-many)"
+      },
+      "status_values": ["open", "reviewing", "fixed", "wont_fix"],
+      "priority_values": ["low", "medium", "high", "critical"]
+    },
+    "user": {
+      "description": "Represents a user account in the system",
+      "primary_key": "id",
+      "required_fields": ["email", "display_name"],
+      "optional_fields": [
+        "avatar_url",
+        "password_hash",
+        "auth_provider",
+        "auth_provider_id"
+      ],
+      "relationships": {
+        "submitted_bugs": "bug_report (one-to-many)",
+        "votes": "bug_vote (one-to-many)",
+        "comments": "comment (one-to-many)",
+        "company_memberships": "company_member (one-to-many)"
+      },
+      "auth_providers": ["email", "google", "github"]
+    },
+    "company": {
+      "description": "Represents a company in the system",
+      "primary_key": "id",
+      "required_fields": ["name", "domain"],
+      "optional_fields": [
+        "verification_email",
+        "verification_token",
+        "verified_at"
+      ],
+      "relationships": {
+        "applications": "application (one-to-many)",
+        "members": "company_member (one-to-many)",
+        "assigned_bugs": "bug_report (one-to-many)"
+      },
+      "verification_status": ["pending", "verified", "rejected"]
+    }
+  },
+  "authentication": {
+    "methods": {
+      "jwt": {
+        "description": "JSON Web Token based authentication",
+        "token_types": ["access_token", "refresh_token"],
+        "header_format": "Authorization: Bearer <token>",
+        "expiration": {
+          "access_token": "15 minutes",
+          "refresh_token": "7 days"
+        }
+      },
+      "oauth": {
+        "description": "OAuth 2.0 authentication with external providers",
+        "supported_providers": ["google", "github"],
+        "flow_type": "authorization_code",
+        "scopes": {
+          "google": ["openid", "email", "profile"],
+          "github": ["user:email"]
+        }
+      }
+    },
+    "endpoints": {
+      "register": "POST /auth/register",
+      "login": "POST /auth/login",
+      "refresh": "POST /auth/refresh",
+      "logout": "POST /auth/logout",
+      "profile": "GET /auth/profile",
+      "oauth_initiate": "GET /auth/oauth/{provider}",
+      "oauth_callback": "GET /auth/oauth/callback/{provider}"
+    }
+  },
+  "rate_limits": {
+    "general": {
+      "requests_per_minute": 60,
+      "burst_limit": 10
+    },
+    "bug_submission": {
+      "requests_per_minute": 5,
+      "anonymous_limit": 3
+    },
+    "authentication": {
+      "login_attempts": 5,
+      "lockout_duration": "15 minutes"
+    }
+  },
+  "security": {
+    "cors": {
+      "allowed_origins": ["http://localhost:3000", "https://bugrelay.com"],
+      "allowed_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      "allowed_headers": ["Origin", "Content-Type", "Authorization", "X-Requested-With"]
+    },
+    "headers": {
+      "content_security_policy": "default-src 'self'",
+      "x_frame_options": "DENY",
+      "x_content_type_options": "nosniff",
+      "referrer_policy": "strict-origin-when-cross-origin"
+    },
+    "input_validation": {
+      "max_request_size": "10MB",
+      "sanitization": "enabled",
+      "xss_protection": "enabled"
+    }
+  },
+  "limitations": {
+    "file_uploads": {
+      "max_file_size": "5MB",
+      "allowed_types": ["image/jpeg", "image/png", "image/gif", "text/plain"],
+      "max_files_per_bug": 5
+    },
+    "text_limits": {
+      "bug_title": 255,
+      "bug_description": 10000,
+      "comment_content": 2000,
+      "display_name": 100
+    },
+    "pagination": {
+      "default_page_size": 20,
+      "max_page_size": 100
+    },
+    "search": {
+      "min_query_length": 3,
+      "max_results": 1000
+    }
+  },
+  "error_handling": {
+    "standard_format": {
+      "error": "string",
+      "message": "string",
+      "code": "integer",
+      "details": "object (optional)"
+    },
+    "common_errors": {
+      "400": "Bad Request - Invalid input data",
+      "401": "Unauthorized - Authentication required",
+      "403": "Forbidden - Insufficient permissions",
+      "404": "Not Found - Resource not found",
+      "409": "Conflict - Resource already exists",
+      "422": "Unprocessable Entity - Validation failed",
+      "429": "Too Many Requests - Rate limit exceeded",
+      "500": "Internal Server Error - Server error"
+    }
+  },
+  "ai_integration": {
+    "recommended_use_cases": [
+      "Automated bug report creation from error logs",
+      "Bug triage and categorization",
+      "Duplicate bug detection",
+      "User support automation",
+      "Company verification assistance",
+      "Analytics and reporting"
+    ],
+    "best_practices": [
+      "Always validate user input before API calls",
+      "Handle rate limits gracefully with exponential backoff",
+      "Use appropriate authentication for different operations",
+      "Implement proper error handling and user feedback",
+      "Cache frequently accessed data to reduce API calls",
+      "Use pagination for large data sets"
+    ],
+    "context_requirements": {
+      "bug_creation": [
+        "Application context (which app has the bug)",
+        "User context (authenticated vs anonymous)",
+        "Technical details (OS, browser, version info)"
+      ],
+      "user_operations": [
+        "Authentication state",
+        "User permissions and roles",
+        "Company affiliations"
+      ],
+      "admin_operations": [
+        "Admin authentication required",
+        "Audit trail considerations",
+        "Impact assessment"
+      ]
+    }
+  },
+  "monitoring": {
+    "health_endpoints": [
+      "GET /health",
+      "GET /api/v1/status"
+    ],
+    "metrics": [
+      "request_count",
+      "response_time",
+      "error_rate",
+      "active_users",
+      "bug_submission_rate"
+    ],
+    "logging": {
+      "levels": ["DEBUG", "INFO", "WARN", "ERROR"],
+      "structured_format": "JSON",
+      "audit_events": [
+        "user_registration",
+        "user_login",
+        "bug_creation",
+        "admin_actions",
+        "company_verification"
+      ]
+    }
+  }
+}

@@ -1,0 +1,742 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BugRelay Data Models",
+  "description": "JSON Schema definitions for all BugRelay backend data models",
+  "definitions": {
+    "User": {
+      "type": "object",
+      "title": "User",
+      "description": "Represents a user account in the system",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique user identifier"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 255,
+          "description": "User's email address"
+        },
+        "display_name": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1,
+          "description": "User's display name"
+        },
+        "avatar_url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "URL to user's avatar image"
+        },
+        "auth_provider": {
+          "type": "string",
+          "enum": ["email", "google", "github"],
+          "default": "email",
+          "description": "Authentication provider used"
+        },
+        "auth_provider_id": {
+          "type": ["string", "null"],
+          "maxLength": 255,
+          "description": "OAuth provider user ID"
+        },
+        "is_email_verified": {
+          "type": "boolean",
+          "default": false,
+          "description": "Email verification status"
+        },
+        "is_admin": {
+          "type": "boolean",
+          "default": false,
+          "description": "Administrative privileges flag"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        },
+        "last_active_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last activity timestamp"
+        }
+      },
+      "required": ["id", "email", "display_name", "auth_provider", "is_email_verified", "is_admin", "created_at", "last_active_at"],
+      "additionalProperties": false
+    },
+    
+    "Company": {
+      "type": "object",
+      "title": "Company",
+      "description": "Represents a company in the system",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique company identifier"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "description": "Company name"
+        },
+        "domain": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}$",
+          "description": "Company domain for verification"
+        },
+        "is_verified": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verification status"
+        },
+        "verification_email": {
+          "type": ["string", "null"],
+          "format": "email",
+          "maxLength": 255,
+          "description": "Email used for verification"
+        },
+        "verified_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Verification completion timestamp"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Company registration timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "name", "domain", "is_verified", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    
+    "Application": {
+      "type": "object",
+      "title": "Application",
+      "description": "Represents an application that can receive bug reports",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique application identifier"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "description": "Application name"
+        },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "Application URL"
+        },
+        "company_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "Associated company identifier"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Application creation timestamp"
+        }
+      },
+      "required": ["id", "name", "created_at"],
+      "additionalProperties": false
+    },
+    
+    "BugReport": {
+      "type": "object",
+      "title": "BugReport",
+      "description": "Represents a bug report in the system",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique bug report identifier"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "description": "Bug report title"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Detailed bug description"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "reviewing", "fixed", "wont_fix"],
+          "default": "open",
+          "description": "Current status of the bug report"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "default": "medium",
+          "description": "Priority level of the bug"
+        },
+        "tags": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "maxItems": 10,
+          "description": "Array of tags for categorization"
+        },
+        "operating_system": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Operating system where bug occurred"
+        },
+        "device_type": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Device type information"
+        },
+        "app_version": {
+          "type": ["string", "null"],
+          "maxLength": 50,
+          "description": "Application version"
+        },
+        "browser_version": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Browser version information"
+        },
+        "application_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Associated application identifier"
+        },
+        "reporter_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "Bug reporter identifier (null for anonymous)"
+        },
+        "assigned_company_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "Company assigned to handle the bug"
+        },
+        "vote_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of upvotes"
+        },
+        "comment_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of comments"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Bug report creation timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        },
+        "deleted_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Soft delete timestamp"
+        },
+        "resolved_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Resolution timestamp"
+        }
+      },
+      "required": ["id", "title", "description", "status", "priority", "application_id", "vote_count", "comment_count", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    
+    "CompanyMember": {
+      "type": "object",
+      "title": "CompanyMember",
+      "description": "Represents the relationship between users and companies",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique membership identifier"
+        },
+        "company_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Company identifier"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "User identifier"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["member", "admin"],
+          "default": "member",
+          "description": "User role in the company"
+        },
+        "added_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Membership creation timestamp"
+        }
+      },
+      "required": ["id", "company_id", "user_id", "role", "added_at"],
+      "additionalProperties": false
+    },
+    
+    "BugVote": {
+      "type": "object",
+      "title": "BugVote",
+      "description": "Represents a user's vote on a bug report",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique vote identifier"
+        },
+        "bug_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Bug report identifier"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "User identifier"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Vote timestamp"
+        }
+      },
+      "required": ["id", "bug_id", "user_id", "created_at"],
+      "additionalProperties": false
+    },
+    
+    "Comment": {
+      "type": "object",
+      "title": "Comment",
+      "description": "Represents a comment on a bug report",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique comment identifier"
+        },
+        "bug_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Bug report identifier"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Comment author identifier"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000,
+          "description": "Comment content"
+        },
+        "is_company_response": {
+          "type": "boolean",
+          "default": false,
+          "description": "Flag for official company responses"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Comment creation timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "bug_id", "user_id", "content", "is_company_response", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    
+    "FileAttachment": {
+      "type": "object",
+      "title": "FileAttachment",
+      "description": "Represents a file attachment for a bug report",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique attachment identifier"
+        },
+        "bug_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Bug report identifier"
+        },
+        "filename": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "description": "Original filename"
+        },
+        "file_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to stored file"
+        },
+        "file_size": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 10485760,
+          "description": "File size in bytes (max 10MB)"
+        },
+        "mime_type": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9!#$&\\-\\^_]*\\/[a-zA-Z0-9][a-zA-Z0-9!#$&\\-\\^_.]*$",
+          "description": "File MIME type"
+        },
+        "uploaded_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Upload timestamp"
+        }
+      },
+      "required": ["id", "bug_id", "filename", "file_url", "uploaded_at"],
+      "additionalProperties": false
+    },
+    
+    "JWTBlacklist": {
+      "type": "object",
+      "title": "JWTBlacklist",
+      "description": "Represents a blacklisted JWT token",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique blacklist entry identifier"
+        },
+        "token_jti": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "description": "JWT ID claim"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Token owner identifier"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Token expiration time"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Blacklist entry timestamp"
+        }
+      },
+      "required": ["id", "token_jti", "user_id", "expires_at", "created_at"],
+      "additionalProperties": false
+    },
+    
+    "AuditLog": {
+      "type": "object",
+      "title": "AuditLog",
+      "description": "Represents an audit log entry for administrative actions",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique audit log identifier"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "bug_flag",
+            "bug_remove", 
+            "bug_merge",
+            "bug_restore",
+            "user_ban",
+            "user_unban",
+            "company_verify",
+            "company_unverify"
+          ],
+          "description": "Action performed"
+        },
+        "resource": {
+          "type": "string",
+          "enum": ["bug_report", "user", "company", "comment"],
+          "description": "Resource type affected"
+        },
+        "resource_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "Specific resource identifier"
+        },
+        "details": {
+          "type": ["string", "null"],
+          "maxLength": 10000,
+          "description": "Additional action details"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "User who performed the action"
+        },
+        "ip_address": {
+          "type": ["string", "null"],
+          "oneOf": [
+            {"format": "ipv4"},
+            {"format": "ipv6"}
+          ],
+          "description": "IP address of the user"
+        },
+        "user_agent": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "User agent string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Action timestamp"
+        }
+      },
+      "required": ["id", "action", "resource", "user_id", "created_at"],
+      "additionalProperties": false
+    }
+  },
+  
+  "components": {
+    "schemas": {
+      "UserResponse": {
+        "allOf": [
+          {"$ref": "#/definitions/User"},
+          {
+            "properties": {
+              "submitted_bugs": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/BugReport"},
+                "description": "Bug reports submitted by the user"
+              },
+              "votes": {
+                "type": "array", 
+                "items": {"$ref": "#/definitions/BugVote"},
+                "description": "Votes cast by the user"
+              },
+              "comments": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/Comment"},
+                "description": "Comments written by the user"
+              },
+              "company_memberships": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/CompanyMember"},
+                "description": "Company memberships of the user"
+              }
+            }
+          }
+        ]
+      },
+      
+      "CompanyResponse": {
+        "allOf": [
+          {"$ref": "#/definitions/Company"},
+          {
+            "properties": {
+              "applications": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/Application"},
+                "description": "Applications owned by the company"
+              },
+              "members": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/CompanyMember"},
+                "description": "Company members"
+              },
+              "assigned_bugs": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/BugReport"},
+                "description": "Bug reports assigned to the company"
+              }
+            }
+          }
+        ]
+      },
+      
+      "BugReportResponse": {
+        "allOf": [
+          {"$ref": "#/definitions/BugReport"},
+          {
+            "properties": {
+              "application": {
+                "$ref": "#/definitions/Application",
+                "description": "Associated application"
+              },
+              "reporter": {
+                "oneOf": [
+                  {"$ref": "#/definitions/User"},
+                  {"type": "null"}
+                ],
+                "description": "Bug reporter (null for anonymous)"
+              },
+              "assigned_company": {
+                "oneOf": [
+                  {"$ref": "#/definitions/Company"},
+                  {"type": "null"}
+                ],
+                "description": "Assigned company (null if unassigned)"
+              },
+              "votes": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/BugVote"},
+                "description": "Votes on the bug report"
+              },
+              "comments": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/Comment"},
+                "description": "Comments on the bug report"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/FileAttachment"},
+                "description": "File attachments"
+              }
+            }
+          }
+        ]
+      },
+      
+      "BugReportCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "description": "Bug report title"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Detailed bug description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "default": "medium",
+            "description": "Priority level"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            },
+            "maxItems": 10,
+            "description": "Tags for categorization"
+          },
+          "operating_system": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Operating system"
+          },
+          "device_type": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Device type"
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Application version"
+          },
+          "browser_version": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Browser version"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Application identifier"
+          },
+          "recaptcha_token": {
+            "type": "string",
+            "description": "reCAPTCHA token (required for anonymous users)"
+          }
+        },
+        "required": ["title", "description", "application_id"],
+        "additionalProperties": false
+      },
+      
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional error details"
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false
+      },
+      
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "validation_errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Field-specific validation errors"
+          }
+        },
+        "required": ["error", "validation_errors"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

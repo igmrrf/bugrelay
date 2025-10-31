@@ -1,0 +1,101 @@
+name: Documentation Generation and Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'docs/**'
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: docs/package-lock.json
+        
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install documentation dependencies
+      working-directory: docs
+      run: npm ci
+      
+    - name: Generate OpenAPI specification
+      working-directory: docs
+      run: npm run generate:openapi
+      
+    - name: Generate JSON schemas
+      working-directory: docs
+      run: npm run generate:schemas
+      
+    - name: Generate MCP documentation
+      working-directory: docs
+      run: npm run generate:mcp
+      
+    - name: Validate generated documentation
+      working-directory: docs
+      run: npm run validate
+      
+    - name: Build documentation site
+      working-directory: docs
+      run: npm run build:site
+      
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: |
+          docs/api/openapi.yaml
+          docs/models/schema.json
+          docs/mcp/tools.json
+          docs/.vitepress/dist/
+        retention-days: 30
+        
+  deploy-docs:
+    needs: generate-docs
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+      
+    steps:
+    - name: Download documentation artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: documentation
+        
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+      
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: '.vitepress/dist'
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2

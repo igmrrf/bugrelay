@@ -1,0 +1,158 @@
+/**
+ * Custom styles for BugRelay documentation
+ */
+
+:root {
+  --vp-c-brand-1: #3b82f6;
+  --vp-c-brand-2: #1d4ed8;
+  --vp-c-brand-3: #1e40af;
+  --vp-c-brand-soft: rgba(59, 130, 246, 0.14);
+  
+  /* Custom accent colors */
+  --vp-c-success: #10b981;
+  --vp-c-warning: #f59e0b;
+  --vp-c-danger: #ef4444;
+  
+  /* Code block enhancements */
+  --vp-code-block-bg: #f8fafc;
+  --vp-code-line-highlight-color: rgba(59, 130, 246, 0.1);
+}
+
+.dark {
+  --vp-code-block-bg: #1e293b;
+}
+
+/* Enhanced code blocks */
+.vp-code-group .tabs {
+  border-radius: 8px 8px 0 0;
+}
+
+.vp-code-group .blocks {
+  border-radius: 0 0 8px 8px;
+}
+
+/* API endpoint styling */
+.api-endpoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.875em;
+  font-weight: 500;
+}
+
+.api-endpoint.get {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--vp-c-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.api-endpoint.post {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--vp-c-brand-1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.api-endpoint.put {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--vp-c-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.api-endpoint.delete {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--vp-c-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-badge.required {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--vp-c-danger);
+}
+
+.status-badge.optional {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: var(--vp-c-text-2);
+}
+
+/* Enhanced tables */
+.vp-doc table {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-bg-soft);
+  font-weight: 600;
+}
+
+/* Custom containers */
+.custom-block.api-example {
+  border-left: 4px solid var(--vp-c-brand-1);
+  background-color: var(--vp-c-brand-soft);
+}
+
+.custom-block.api-example .custom-block-title {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+/* Interactive elements */
+.copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  font-size: 0.75em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.vp-code-group:hover .copy-button,
+div[class*="language-"]:hover .copy-button {
+  opacity: 1;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .api-endpoint {
+    font-size: 0.75em;
+    padding: 2px 6px;
+  }
+  
+  .vp-doc table {
+    font-size: 0.875em;
+  }
+}
+
+/* Print styles */
+@media print {
+  .VPNav,
+  .VPSidebar,
+  .edit-link,
+  .prev-next {
+    display: none !important;
+  }
+  
+  .VPContent {
+    padding-left: 0 !important;
+  }
+}

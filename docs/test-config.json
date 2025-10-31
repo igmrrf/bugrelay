@@ -1,0 +1,50 @@
+{
+  "testConfiguration": {
+    "apiBaseUrl": "http://localhost:8080",
+    "timeout": 30000,
+    "retries": 3,
+    "testUser": {
+      "email": "test@example.com",
+      "password": "testpassword123",
+      "displayName": "Test User"
+    }
+  },
+  "validationRules": {
+    "openapi": {
+      "requireExamples": true,
+      "requireDescriptions": true,
+      "requireSecurity": true,
+      "maxWarnings": 10
+    },
+    "examples": {
+      "validateSyntax": true,
+      "validateResponses": true,
+      "requireErrorHandling": true,
+      "supportedLanguages": ["curl", "javascript", "python"]
+    },
+    "completeness": {
+      "requireAllEndpoints": true,
+      "requireAllModels": true,
+      "requireMCPTools": true,
+      "maxMissingExamples": 5
+    },
+    "performance": {
+      "maxBuildTime": 30000,
+      "maxDocumentationSize": 104857600,
+      "maxResponseTime": 5000
+    }
+  },
+  "reporting": {
+    "generateJson": true,
+    "generateHtml": false,
+    "outputDirectory": "test-reports",
+    "includeTimestamps": true,
+    "includeEnvironmentInfo": true
+  },
+  "ci": {
+    "failOnWarnings": false,
+    "failOnErrors": true,
+    "uploadArtifacts": true,
+    "notifyOnFailure": true
+  }
+}

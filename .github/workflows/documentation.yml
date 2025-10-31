@@ -1,0 +1,329 @@
+name: Documentation Maintenance
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - 'docs/**'
+      - '.github/workflows/documentation.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'docs/**'
+  schedule:
+    # Run daily at 2 AM UTC to check for documentation drift
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force_regenerate:
+        description: 'Force regenerate all documentation'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  GO_VERSION: '1.21'
+
+jobs:
+  detect-changes:
+    name: Detect Documentation Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      docs-changed: ${{ steps.changes.outputs.docs }}
+      force-regenerate: ${{ github.event.inputs.force_regenerate == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**/*.go'
+              - 'backend/go.mod'
+              - 'backend/go.sum'
+            docs:
+              - 'docs/**'
+              - '.github/workflows/documentation.yml'
+
+  validate-existing-docs:
+    name: Validate Existing Documentation
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs-changed == 'true' || needs.detect-changes.outputs.force-regenerate == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install documentation dependencies
+        run: |
+          cd docs
+          npm ci
+
+      - name: Validate OpenAPI specification
+        run: |
+          cd docs
+          npm run validate:openapi
+
+      - name: Validate JSON schemas
+        run: |
+          cd docs
+          npm run validate:schemas
+
+      - name: Check documentation completeness
+        run: |
+          cd docs
+          node scripts/check-completeness.js
+
+  regenerate-docs:
+    name: Regenerate Documentation
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate-existing-docs]
+    if: |
+      always() && 
+      (needs.detect-changes.outputs.backend-changed == 'true' || 
+       needs.detect-changes.outputs.force-regenerate == 'true' ||
+       needs.validate-existing-docs.result == 'failure')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install documentation dependencies
+        run: |
+          cd docs
+          npm ci
+
+      - name: Analyze backend codebase
+        run: |
+          cd backend
+          go mod tidy
+          go build -o ../docs/bin/analyzer ./cmd/doc-analyzer
+
+      - name: Generate documentation
+        run: |
+          cd docs
+          npm run generate:all
+
+      - name: Validate generated documentation
+        run: |
+          cd docs
+          npm run validate
+
+      - name: Test documentation accuracy
+        run: |
+          cd docs
+          npm run test:accuracy
+
+      - name: Build documentation site
+        run: |
+          cd docs
+          npm run build
+
+      - name: Check for documentation changes
+        id: doc-changes
+        run: |
+          if git diff --quiet; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit documentation updates
+        if: steps.doc-changes.outputs.changes == 'true' && github.event_name != 'pull_request'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/
+          git commit -m "docs: auto-update documentation from code changes [skip ci]"
+          git push
+
+      - name: Create documentation update PR
+        if: steps.doc-changes.outputs.changes == 'true' && github.event_name == 'pull_request'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: auto-update documentation from code changes"
+          title: "Auto-update documentation"
+          body: |
+            This PR contains automatically generated documentation updates based on code changes.
+            
+            ## Changes
+            - Updated OpenAPI specification
+            - Regenerated JSON schemas
+            - Updated MCP tool definitions
+            
+            Please review the changes before merging.
+          branch: docs/auto-update-${{ github.event.pull_request.number }}
+
+  test-documentation:
+    name: Test Documentation Accuracy
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs-changed == 'true' || needs.detect-changes.outputs.backend-changed == 'true'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_USER: testuser
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          go mod tidy
+
+      - name: Install documentation dependencies
+        run: |
+          cd docs
+          npm ci
+
+      - name: Run database migrations
+        run: |
+          cd backend
+          go run cmd/migrate/main.go up
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+
+      - name: Start backend server
+        run: |
+          cd backend
+          go run main.go &
+          sleep 10
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+          PORT: 8080
+
+      - name: Test API endpoints against documentation
+        run: |
+          cd docs
+          npm run test:api-accuracy
+
+      - name: Test code examples
+        run: |
+          cd docs
+          npm run test:examples
+
+      - name: Generate test coverage report
+        run: |
+          cd docs
+          npm run test:coverage
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [regenerate-docs, test-documentation]
+    if: |
+      always() && 
+      github.ref == 'refs/heads/main' && 
+      (needs.regenerate-docs.result == 'success' || needs.regenerate-docs.result == 'skipped') &&
+      (needs.test-documentation.result == 'success' || needs.test-documentation.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd docs
+          npm ci
+
+      - name: Build documentation site
+        run: |
+          cd docs
+          npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/.vitepress/dist
+          cname: docs.bugrelay.com
+
+  notify-on-failure:
+    name: Notify on Documentation Failure
+    runs-on: ubuntu-latest
+    needs: [validate-existing-docs, regenerate-docs, test-documentation]
+    if: |
+      always() && 
+      (needs.validate-existing-docs.result == 'failure' || 
+       needs.regenerate-docs.result == 'failure' || 
+       needs.test-documentation.result == 'failure')
+    steps:
+      - name: Send notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "Documentation maintenance workflow failed. Please check the logs."
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

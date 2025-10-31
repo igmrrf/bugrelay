@@ -1,0 +1,178 @@
+{
+  "tools": [
+    {
+      "name": "get_admin_dashboard",
+      "description": "Get administrative dashboard with system statistics (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date_range": {
+            "type": "string",
+            "enum": ["7d", "30d", "90d", "1y"],
+            "description": "Date range for statistics",
+            "default": "30d"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_bugs_for_moderation",
+      "description": "List bug reports that require moderation (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination",
+            "default": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page",
+            "default": 20
+          },
+          "flagged_only": {
+            "type": "boolean",
+            "description": "Show only flagged bugs",
+            "default": false
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "reviewing", "fixed", "wont_fix"],
+            "description": "Filter by bug status"
+          }
+        }
+      }
+    },
+    {
+      "name": "flag_bug",
+      "description": "Flag a bug report for review (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bug_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the bug report to flag"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["spam", "inappropriate", "duplicate", "invalid", "other"],
+            "description": "Reason for flagging the bug"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Additional notes about the flag"
+          }
+        },
+        "required": ["bug_id", "reason"]
+      }
+    },
+    {
+      "name": "remove_bug",
+      "description": "Remove (soft delete) a bug report (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bug_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the bug report to remove"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for removing the bug report"
+          }
+        },
+        "required": ["bug_id", "reason"]
+      }
+    },
+    {
+      "name": "restore_bug",
+      "description": "Restore a previously removed bug report (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bug_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the bug report to restore"
+          }
+        },
+        "required": ["bug_id"]
+      }
+    },
+    {
+      "name": "merge_bugs",
+      "description": "Merge duplicate bug reports (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "primary_bug_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the primary bug report to keep"
+          },
+          "duplicate_bug_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Array of duplicate bug report UUIDs to merge into the primary"
+          },
+          "merge_notes": {
+            "type": "string",
+            "description": "Notes about the merge operation"
+          }
+        },
+        "required": ["primary_bug_id", "duplicate_bug_ids"]
+      }
+    },
+    {
+      "name": "get_audit_logs",
+      "description": "Retrieve system audit logs (requires admin authentication)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination",
+            "default": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page",
+            "default": 50
+          },
+          "action_type": {
+            "type": "string",
+            "enum": ["create", "update", "delete", "login", "logout", "admin_action"],
+            "description": "Filter by action type"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter by user ID"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date for log filtering (ISO 8601 format)"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End date for log filtering (ISO 8601 format)"
+          }
+        }
+      }
+    }
+  ]
+}

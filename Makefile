@@ -103,3 +103,32 @@ lint-backend:
 	@echo "🔍 Linting backend..."
 	cd backend && go vet ./...
 	cd backend && go fmt ./...
+
+# Documentation commands
+docs-setup:
+	@echo "📚 Setting up documentation..."
+	cd docs && npm install
+
+docs-build:
+	@echo "📚 Building documentation..."
+	cd docs && npm run build
+
+docs-dev:
+	@echo "📚 Starting documentation development server..."
+	cd docs && npm run dev
+
+docs-maintenance:
+	@echo "🔧 Running documentation maintenance..."
+	cd docs && npm run maintenance
+
+docs-test:
+	@echo "🧪 Testing documentation accuracy..."
+	cd docs && npm run test:coverage
+
+docs-validate:
+	@echo "✅ Validating documentation..."
+	cd docs && npm run validate
+
+docs-clean:
+	@echo "🧹 Cleaning documentation artifacts..."
+	cd docs && npm run clean

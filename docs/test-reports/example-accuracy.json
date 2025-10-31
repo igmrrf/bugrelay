@@ -1,0 +1,796 @@
+{
+  "timestamp": "2025-10-31T18:47:41.485Z",
+  "summary": {
+    "total": 119,
+    "passed": 67,
+    "failed": 52,
+    "errors": 52,
+    "warnings": 63
+  },
+  "results": [
+    {
+      "test": "api/examples/curl-examples.md-curl-1",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-2",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-3",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-4",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-5",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-6",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-7",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-8",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-9",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-10",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-11",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-12",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-13",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-14",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-15",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-16",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-17",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-18",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-19",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-20",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-21",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-22",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-23",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-24",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-25",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-26",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-27",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-28",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-29",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-30",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-31",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-32",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-33",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-34",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-35",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-36",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-37",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-38",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-39",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-40",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-41",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-42",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-43",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-44",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-45",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-46",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-47",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-48",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-49",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-50",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-51",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-52",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-53",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-54",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-curl-55",
+      "type": "curl-syntax",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-1",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-1.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-2",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-2.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-3",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-3.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-4",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-4.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-5",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-5.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-6",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-6.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-7",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-7.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-8",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-8.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-9",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-9.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-10",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-10.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-11",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-11.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-12",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-12.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-13",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-13.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-14",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-14.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-15",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-15.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-16",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-16.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-17",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-17.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-18",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-18.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-19",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-19.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-20",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-20.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-21",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-21.js'"
+    },
+    {
+      "test": "api/examples/javascript-examples.md-js-22",
+      "type": "javascript-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-22.js'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-1",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-1.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-2",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-2.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-3",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-3.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-4",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-4.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-5",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-5.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-6",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-6.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-7",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-7.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-8",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-8.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-9",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-9.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-10",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-10.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-11",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-11.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-12",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-12.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-13",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-13.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-14",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-14.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-15",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-15.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-16",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-16.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-17",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-17.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-18",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-18.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-19",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-19.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-20",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-20.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-21",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-21.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-22",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-22.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-23",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-23.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-24",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-24.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-25",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-25.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-26",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-26.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-27",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-27.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-28",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-28.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-29",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-29.py'"
+    },
+    {
+      "test": "api/examples/python-examples.md-python-30",
+      "type": "python-syntax",
+      "status": "failed",
+      "error": "ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-30.py'"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-1",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-2",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-3",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-4",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-5",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-6",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-7",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-8",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-9",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-10",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-11",
+      "type": "response-validation",
+      "status": "passed"
+    },
+    {
+      "test": "api/examples/curl-examples.md-response-12",
+      "type": "response-validation",
+      "status": "passed"
+    }
+  ],
+  "errors": [
+    "api/examples/javascript-examples.md-js-1: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-1.js'",
+    "api/examples/javascript-examples.md-js-2: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-2.js'",
+    "api/examples/javascript-examples.md-js-3: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-3.js'",
+    "api/examples/javascript-examples.md-js-4: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-4.js'",
+    "api/examples/javascript-examples.md-js-5: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-5.js'",
+    "api/examples/javascript-examples.md-js-6: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-6.js'",
+    "api/examples/javascript-examples.md-js-7: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-7.js'",
+    "api/examples/javascript-examples.md-js-8: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-8.js'",
+    "api/examples/javascript-examples.md-js-9: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-9.js'",
+    "api/examples/javascript-examples.md-js-10: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-10.js'",
+    "api/examples/javascript-examples.md-js-11: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-11.js'",
+    "api/examples/javascript-examples.md-js-12: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-12.js'",
+    "api/examples/javascript-examples.md-js-13: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-13.js'",
+    "api/examples/javascript-examples.md-js-14: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-14.js'",
+    "api/examples/javascript-examples.md-js-15: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-15.js'",
+    "api/examples/javascript-examples.md-js-16: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-16.js'",
+    "api/examples/javascript-examples.md-js-17: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-17.js'",
+    "api/examples/javascript-examples.md-js-18: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-18.js'",
+    "api/examples/javascript-examples.md-js-19: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-19.js'",
+    "api/examples/javascript-examples.md-js-20: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-20.js'",
+    "api/examples/javascript-examples.md-js-21: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-21.js'",
+    "api/examples/javascript-examples.md-js-22: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/javascript-examples.md-js-22.js'",
+    "api/examples/python-examples.md-python-1: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-1.py'",
+    "api/examples/python-examples.md-python-2: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-2.py'",
+    "api/examples/python-examples.md-python-3: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-3.py'",
+    "api/examples/python-examples.md-python-4: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-4.py'",
+    "api/examples/python-examples.md-python-5: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-5.py'",
+    "api/examples/python-examples.md-python-6: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-6.py'",
+    "api/examples/python-examples.md-python-7: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-7.py'",
+    "api/examples/python-examples.md-python-8: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-8.py'",
+    "api/examples/python-examples.md-python-9: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-9.py'",
+    "api/examples/python-examples.md-python-10: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-10.py'",
+    "api/examples/python-examples.md-python-11: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-11.py'",
+    "api/examples/python-examples.md-python-12: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-12.py'",
+    "api/examples/python-examples.md-python-13: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-13.py'",
+    "api/examples/python-examples.md-python-14: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-14.py'",
+    "api/examples/python-examples.md-python-15: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-15.py'",
+    "api/examples/python-examples.md-python-16: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-16.py'",
+    "api/examples/python-examples.md-python-17: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-17.py'",
+    "api/examples/python-examples.md-python-18: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-18.py'",
+    "api/examples/python-examples.md-python-19: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-19.py'",
+    "api/examples/python-examples.md-python-20: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-20.py'",
+    "api/examples/python-examples.md-python-21: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-21.py'",
+    "api/examples/python-examples.md-python-22: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-22.py'",
+    "api/examples/python-examples.md-python-23: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-23.py'",
+    "api/examples/python-examples.md-python-24: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-24.py'",
+    "api/examples/python-examples.md-python-25: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-25.py'",
+    "api/examples/python-examples.md-python-26: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-26.py'",
+    "api/examples/python-examples.md-python-27: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-27.py'",
+    "api/examples/python-examples.md-python-28: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-28.py'",
+    "api/examples/python-examples.md-python-29: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-29.py'",
+    "api/examples/python-examples.md-python-30: Syntax error - ENOENT: no such file or directory, open '/Users/igmrrf/Desktop/Basket/projects/bugrelay/docs/temp-examples/api/examples/python-examples.md-python-30.py'"
+  ],
+  "warnings": [
+    "api/examples/curl-examples.md-curl-1: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-2: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-3: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-4: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-5: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-6: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-7: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-8: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-9: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-10: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-11: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-12: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-13: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-14: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-15: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-16: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-17: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-18: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-19: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-20: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-21: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-22: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-23: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-24: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-25: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-26: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-27: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-28: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-29: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-30: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-31: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-32: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-33: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-34: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-35: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-36: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-37: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-38: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-39: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-40: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-41: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-42: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-43: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-44: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-45: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-46: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-47: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-48: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-49: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-50: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-51: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-52: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-53: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-54: No URL found in curl command",
+    "api/examples/curl-examples.md-curl-55: No URL found in curl command",
+    "Missing example for endpoint: GET /health",
+    "Missing example for endpoint: GET /api/v1/status",
+    "Missing example for endpoint: POST /api/v1/auth/register",
+    "Missing example for endpoint: POST /api/v1/auth/login",
+    "Missing example for endpoint: POST /api/v1/auth/refresh",
+    "Missing example for endpoint: POST /api/v1/auth/logout",
+    "Missing example for endpoint: GET /api/v1/auth/profile",
+    "Missing example for endpoint: PUT /api/v1/auth/profile"
+  ],
+  "testTypes": {
+    "curl-syntax": {
+      "passed": 55,
+      "failed": 0
+    },
+    "javascript-syntax": {
+      "passed": 0,
+      "failed": 22
+    },
+    "python-syntax": {
+      "passed": 0,
+      "failed": 30
+    },
+    "response-validation": {
+      "passed": 12,
+      "failed": 0
+    }
+  }
+}
