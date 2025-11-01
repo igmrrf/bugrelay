@@ -1,147 +1,88 @@
-.PHONY: help setup dev-frontend dev-backend build-frontend build-backend build docker-up docker-down clean
+.PHONY: help dev prod stop clean clean-volumes clean-all logs shell seed
 
 # Default target
 help:
-	@echo "BugRelay Development Commands"
+	@echo "BugRelay - Simplified Development Commands"
 	@echo ""
-	@echo "Setup:"
-	@echo "  make setup           Install all dependencies"
-	@echo "  make setup-frontend  Install frontend dependencies"
-	@echo "  make setup-backend   Install backend dependencies"
+	@echo "🚀 Core Commands:"
+	@echo "  make dev             Start development environment"
+	@echo "  make prod            Start production environment"
+	@echo "  make stop            Stop all services"
+	@echo "  make clean           Remove containers (keeps data)"
+	@echo "  make clean-volumes   Remove containers and volumes (removes data)"
+	@echo "  make clean-all       Complete cleanup (removes everything)"
 	@echo ""
-	@echo "Development:"
-	@echo "  make dev-frontend    Start frontend development server"
-	@echo "  make dev-backend     Start backend development server"
-	@echo "  make dev-docs        Start documentation development server"
+	@echo "🔧 Utilities:"
+	@echo "  make logs            View service logs"
+	@echo "  make shell           Access backend container shell"
+	@echo "  make seed            Populate database with test data"
+	@echo "  make help            Show this help message"
 	@echo ""
-	@echo "Docker:"
-	@echo "  make docker-up       Start all services with Docker"
-	@echo "  make docker-down     Stop all Docker services"
+	@echo "📋 Prerequisites:"
+	@echo "  - Docker and Docker Compose installed"
+	@echo "  - .env file configured (copied from .env.example)"
+
+# Prerequisite validation
+check-docker:
+	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required but not installed. Please install Docker first."; exit 1; }
+	@command -v docker-compose >/dev/null 2>&1 || { echo "❌ Docker Compose is required but not installed. Please install Docker Compose first."; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "❌ Docker daemon is not running. Please start Docker first."; exit 1; }
+
+check-env:
+	@test -f .env || { echo "❌ .env file not found. Please copy .env.example to .env and configure it."; exit 1; }
+
+# Core commands
+dev: check-docker check-env
+	@echo "🚀 Starting development environment..."
+	@docker-compose --profile dev up -d
+	@echo "✅ Development environment started!"
 	@echo ""
-	@echo "Build:"
-	@echo "  make build           Build both frontend and backend"
-	@echo "  make build-frontend  Build frontend only"
-	@echo "  make build-backend   Build backend only"
-	@echo "  make build-docs      Build documentation site"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  make docs-setup      Install documentation dependencies"
-	@echo "  make docs-dev        Start documentation development server"
-	@echo "  make docs-generate   Generate API docs from codebase"
-	@echo "  make docs-validate   Validate generated documentation"
-	@echo "  make docs-test       Run documentation tests"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  make clean           Clean build artifacts"
+	@echo "📍 Services available at:"
+	@echo "  Frontend:    http://localhost:3000"
+	@echo "  Backend API: http://localhost:8080"
+	@echo "  Grafana:     http://localhost:3001 (admin/admin123)"
+	@echo "  MailHog:     http://localhost:8025"
 
-# Setup commands
-setup: setup-frontend setup-backend docs-setup
-	@echo "✅ Setup complete!"
+prod: check-docker check-env
+	@echo "🚀 Starting production environment..."
+	@docker-compose --profile prod up -d
+	@echo "✅ Production environment started!"
 
-setup-frontend:
-	@echo "📦 Installing frontend dependencies..."
-	cd frontend && npm install
+stop:
+	@echo "🛑 Stopping all services..."
+	@docker-compose down
+	@echo "✅ All services stopped"
 
-setup-backend:
-	@echo "📦 Installing backend dependencies..."
-	cd backend && go mod tidy
+# Clean commands with different levels
+clean:
+	@echo "🧹 Cleaning up containers..."
+	@docker-compose down --remove-orphans
+	@echo "✅ Containers stopped and removed"
 
-# Development commands
-dev-frontend:
-	@echo "🚀 Starting frontend development server..."
-	cd frontend && npm run dev
+clean-volumes:
+	@echo "🧹 Cleaning up containers and volumes..."
+	@echo "⚠️  This will remove all data in volumes (databases, etc.)"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@docker-compose down -v --remove-orphans
+	@echo "✅ Containers and volumes removed"
 
-dev-backend:
-	@echo "🚀 Starting backend development server..."
-	cd backend && go run main.go
-
-dev-docs:
-	@echo "📚 Starting documentation development server..."
-	cd docs && npm run dev
-
-# Docker commands
-docker-up:
-	@echo "🐳 Starting all services with Docker..."
-	docker-compose up -d
-
-docker-down:
-	@echo "🐳 Stopping all Docker services..."
-	docker-compose down
-
-# Build commands
-build: build-frontend build-backend build-docs
-	@echo "✅ Build complete!"
-
-build-frontend:
-	@echo "🔨 Building frontend..."
-	cd frontend && npm run build
-
-build-backend:
-	@echo "🔨 Building backend..."
-	cd backend && go build -o bin/server main.go
-
-build-docs:
-	@echo "📚 Building documentation..."
-	cd docs && npm run build
+clean-all:
+	@echo "🧹 Complete cleanup (containers, volumes, and unused Docker resources)..."
+	@echo "⚠️  This will remove all data and unused Docker resources"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@docker-compose down -v --remove-orphans
+	@docker system prune -f
+	@echo "✅ Complete cleanup finished"
 
 # Utility commands
-clean:
-	@echo "🧹 Cleaning build artifacts..."
-	rm -rf frontend/.next
-	rm -rf frontend/out
-	rm -rf backend/bin
-	rm -rf backend/tmp
-	@echo "✅ Clean complete!"
+logs:
+	@echo "📋 Viewing service logs (Ctrl+C to exit)..."
+	@docker-compose logs -f
 
-# Database commands
-db-migrate-up:
-	@echo "📊 Running database migrations..."
-	cd backend && migrate -path migrations -database "postgres://bugrelay_user:bugrelay_password@localhost:5432/bugrelay?sslmode=disable" up
+shell:
+	@echo "🐚 Accessing backend container shell..."
+	@docker-compose exec backend sh || echo "❌ Backend container not running. Start with 'make dev' first."
 
-db-migrate-down:
-	@echo "📊 Rolling back database migrations..."
-	cd backend && migrate -path migrations -database "postgres://bugrelay_user:bugrelay_password@localhost:5432/bugrelay?sslmode=disable" down
-
-# Test commands
-test-frontend:
-	@echo "🧪 Running frontend tests..."
-	cd frontend && npm run test
-
-test-backend:
-	@echo "🧪 Running backend tests..."
-	cd backend && go test ./...
-
-# Lint commands
-lint-frontend:
-	@echo "🔍 Linting frontend..."
-	cd frontend && npm run type-check
-
-lint-backend:
-	@echo "🔍 Linting backend..."
-	cd backend && go vet ./...
-	cd backend && go fmt ./...
-
-# Documentation commands
-docs-setup:
-	@echo "📚 Setting up documentation..."
-	cd docs && npm install
-
-docs-generate:
-	@echo "📚 Generating documentation from codebase..."
-	cd docs && npm run generate:all
-
-docs-validate:
-	@echo "✅ Validating documentation..."
-	cd docs && npm run validate
-
-docs-test:
-	@echo "🧪 Testing documentation accuracy..."
-	cd docs && npm run test:comprehensive
-
-docs-maintenance:
-	@echo "🔧 Running documentation maintenance..."
-	cd docs && npm run maintenance
-
-docs-clean:
-	@echo "🧹 Cleaning documentation artifacts..."
-	cd docs && npm run clean
+seed:
+	@echo "🌱 Seeding database with test data..."
+	@docker-compose exec backend go run cmd/seed/main.go || echo "❌ Failed to seed database. Ensure backend is running."

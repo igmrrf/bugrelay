@@ -63,11 +63,17 @@ export const bugsAPI = {
     if (filters.page) params.append('page', filters.page.toString())
     if (filters.limit) params.append('limit', filters.limit.toString())
 
-    return apiClient.get(`/bugs?${params.toString()}`)
+    const response = await apiClient.get<{bugs: BugReport[], pagination: any}>(`/bugs/?${params.toString()}`)
+    return {
+      bugs: response.bugs,
+      totalCount: response.pagination.total,
+      hasNextPage: response.pagination.has_next
+    }
   },
 
   get: async (id: string): Promise<BugReport> => {
-    return apiClient.get(`/bugs/${id}`)
+    const response = await apiClient.get<{bug: BugReport}>(`/bugs/${id}/`)
+    return response.bug
   },
 
   create: async (data: CreateBugData): Promise<BugReport> => {
@@ -91,14 +97,14 @@ export const bugsAPI = {
         formData.append(`screenshots`, file)
       })
 
-      return apiClient.post('/bugs', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      // For now, create bug without screenshots since backend doesn't support multipart
+      const response = await apiClient.post<{bug: BugReport, message: string}>('/bugs/', data)
+      console.warn('File uploads not yet implemented - bug created without screenshots')
+      return response.bug
     }
 
-    return apiClient.post('/bugs', data)
+    const response = await apiClient.post<{bug: BugReport, message: string}>('/bugs/', data)
+    return response.bug
   },
 
   update: async (id: string, data: UpdateBugData): Promise<BugReport> => {

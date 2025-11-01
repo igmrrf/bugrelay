@@ -21,7 +21,8 @@ query_range:
     cache:
       embedded_cache:
         enabled: true
-        max_size_mb: 100
+        # Development: smaller cache, Production: larger cache
+        max_size_mb: ${LOKI_CACHE_SIZE_MB:-100}
 
 schema_config:
   configs:
@@ -36,14 +37,21 @@ schema_config:
 ruler:
   alertmanager_url: http://alertmanager:9093
 
-# By default, Loki will send anonymous, but uniquely-identifiable usage and configuration
-# analytics to Grafana Labs. These statistics are sent to https://stats.grafana.org/
-#
-# Statistics help us better understand how Loki is used, and they show us performance
-# levels for most users. This helps us prioritize features and documentation.
-# For more information on what's sent: https://github.com/grafana/loki/blob/main/docs/sources/configuration/telemetry.md
-# Refer to the buildReport method to see what goes into a report.
-#
-# If you would like to disable reporting, uncomment the following lines:
+# Retention and limits configuration
+limits_config:
+  # Development: 7 days, Production: 30 days
+  retention_period: ${LOKI_RETENTION_PERIOD:-7d}
+  max_query_series: ${LOKI_MAX_QUERY_SERIES:-10000}
+  max_query_parallelism: ${LOKI_MAX_QUERY_PARALLELISM:-16}
+
+# Compactor configuration (mainly for production)
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: ${LOKI_COMPACTION_INTERVAL:-10m}
+  retention_enabled: ${LOKI_RETENTION_ENABLED:-true}
+  retention_delete_delay: ${LOKI_RETENTION_DELETE_DELAY:-2h}
+  retention_delete_worker_count: ${LOKI_RETENTION_DELETE_WORKER_COUNT:-50}
+
 analytics:
   reporting_enabled: false

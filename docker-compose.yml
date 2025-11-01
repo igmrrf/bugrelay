@@ -1,78 +1,641 @@
-version: '3.8'
-
 services:
+  # PostgreSQL Database - Base service for both dev and prod
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17.0-alpine
     container_name: bugrelay-postgres
     environment:
-      POSTGRES_DB: bugrelay
-      POSTGRES_USER: bugrelay_user
-      POSTGRES_PASSWORD: bugrelay_password
+      POSTGRES_DB: ${DB_NAME:-bugrelay}
+      POSTGRES_USER: ${DB_USER:-bugrelay_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bugrelay_password}
     ports:
-      - "5432:5432"
+      # Only expose port in development
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - bugrelay
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bugrelay_user -d bugrelay"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bugrelay_user} -d ${DB_NAME:-bugrelay}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Redis Cache - Base service for both dev and prod
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.1-alpine
     container_name: bugrelay-redis
+    command: >
+      sh -c "
+        if [ '${ENVIRONMENT:-development}' = 'production' ]; then
+          redis-server --requirepass "${REDIS_PASSWORD}"
+        else
+          redis-server
+        fi
+      "
     ports:
-      - "6379:6379"
+      # Only expose port in development
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - bugrelay
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: >
+        sh -c "
+          if [ '${ENVIRONMENT:-development}' = 'production' ]; then
+            redis-cli --no-auth-warning -a ${REDIS_PASSWORD} ping
+          else
+            redis-cli ping
+          fi
+        "
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Backend API - Development Profile
   backend:
+    profiles: ["dev"]
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
-    container_name: bugrelay-backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: bugrelay-backend-dev
     ports:
       - "8080:8080"
+      - "2345:2345" # Delve debugger port
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=bugrelay
-      - DB_USER=bugrelay_user
-      - DB_PASSWORD=bugrelay_password
+      - DB_NAME=${DB_NAME:-bugrelay}
+      - DB_USER=${DB_USER:-bugrelay_user}
+      - DB_PASSWORD=${DB_PASSWORD:-bugrelay_password}
+      - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=your-jwt-secret-key-change-in-production
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-key}
       - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=json
+      - LOG_OUTPUT=both
     volumes:
       - ./backend:/app
+      - backend_logs:/app/logs
+    networks:
+      - bugrelay
+      - monitoring
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: air -c .air.toml
+    restart: unless-stopped
 
+
+  # Frontend - Development Profile
   frontend:
+    profiles: ["dev"]
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: bugrelay-frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: bugrelay-frontend-dev
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+      - BACKEND_LOGS_URL=http://backend:8080
+      - BACKEND_API_KEY=${LOGS_API_KEY:-dev-api-key}
+      - WATCHPACK_POLLING=true
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
+      - frontend_logs:/app/logs
+    networks:
+      - bugrelay
+      - monitoring
     depends_on:
       - backend
+    restart: unless-stopped
+
+
+  # MailHog for email testing - Development Profile
+  mailhog:
+    profiles: ["dev"]
+    image: mailhog/mailhog:v1.0.1
+    container_name: bugrelay-mailhog-dev
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    networks:
+      - bugrelay
+    restart: unless-stopped
+
+  # Grafana for monitoring - Development Profile
+  grafana:
+    profiles: ["dev"]
+    image: grafana/grafana:11.3.0
+    container_name: bugrelay-grafana-dev
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # Prometheus for metrics - Development Profile
+  prometheus:
+    profiles: ["dev"]
+    image: prom/prometheus:v2.55.0
+    container_name: bugrelay-prometheus-dev
+    ports:
+      - "9090:9090"
+    environment:
+      - ENVIRONMENT=development
+      - PROMETHEUS_SCRAPE_INTERVAL=15s
+      - PROMETHEUS_EVALUATION_INTERVAL=15s
+      - PROMETHEUS_CLUSTER=bugrelay-dev
+      - PROMETHEUS_SELF_SCRAPE_INTERVAL=60s
+      - BACKEND_TARGET=backend:8080
+      - FRONTEND_TARGET=frontend:3000
+      - BACKEND_SCRAPE_INTERVAL=15s
+      - FRONTEND_SCRAPE_INTERVAL=30s
+      - LOKI_SCRAPE_INTERVAL=30s
+      - GRAFANA_SCRAPE_INTERVAL=60s
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # Loki for log aggregation - Development Profile
+  loki:
+    profiles: ["dev"]
+    image: grafana/loki:3.2.0
+    container_name: bugrelay-loki-dev
+    ports:
+      - "3100:3100"
+    environment:
+      - LOKI_CACHE_SIZE_MB=100
+      - LOKI_RETENTION_PERIOD=7d
+      - LOKI_MAX_QUERY_SERIES=10000
+      - LOKI_MAX_QUERY_PARALLELISM=16
+      - LOKI_COMPACTION_INTERVAL=10m
+      - LOKI_RETENTION_ENABLED=true
+      - LOKI_RETENTION_DELETE_DELAY=2h
+      - LOKI_RETENTION_DELETE_WORKER_COUNT=50
+    command: 
+      - '-config.file=/etc/loki/local-config.yaml' 
+      - '-config.expand-env=true'
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # Promtail for log collection - Development Profile
+  promtail:
+    profiles: ["dev"]
+    image: grafana/promtail:3.2.0
+    container_name: bugrelay-promtail-dev
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml
+      - backend_logs:/var/log/bugrelay
+      - frontend_logs:/var/log/frontend
+      - /var/log:/var/log/host:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # AlertManager for alerting - Development Profile
+  alertmanager:
+    profiles: ["dev"]
+    image: prom/alertmanager:v0.27.0
+    container_name: bugrelay-alertmanager-dev
+    ports:
+      - "9093:9093"
+    environment:
+      - ENVIRONMENT=development
+      - SMTP_HOST=mailhog:1025
+      - SMTP_FROM=alerts@bugrelay-dev.local
+      - SMTP_REQUIRE_TLS=false
+      - ALERT_GROUP_WAIT=5s
+      - ALERT_GROUP_INTERVAL=5m
+      - ALERT_REPEAT_INTERVAL=30m
+      - CRITICAL_GROUP_WAIT=1s
+      - CRITICAL_REPEAT_INTERVAL=5m
+      - WARNING_GROUP_WAIT=5s
+      - WARNING_REPEAT_INTERVAL=15m
+      - DEFAULT_EMAIL_TO=dev-team@bugrelay-dev.local
+      - CRITICAL_EMAIL_TO=dev-team@bugrelay-dev.local
+      - DATABASE_EMAIL_TO=dev-team@bugrelay-dev.local
+      - SECURITY_EMAIL_TO=dev-team@bugrelay-dev.local
+      - WARNING_EMAIL_TO=dev-team@bugrelay-dev.local
+      - MONITORING_EMAIL_TO=dev-team@bugrelay-dev.local
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # Node Exporter for system metrics - Development Profile
+  node-exporter:
+    profiles: ["dev"]
+    image: prom/node-exporter:v1.8.2
+    container_name: bugrelay-node-exporter-dev
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)'
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # cAdvisor for container metrics - Development Profile
+  cadvisor:
+    profiles: ["dev"]
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: bugrelay-cadvisor-dev
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - bugrelay
+      - monitoring
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy - Production Profile
+  nginx:
+    profiles: ["prod"]
+    image: nginx:1.27-alpine
+    container_name: bugrelay-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - bugrelay
+      - monitoring
+    depends_on:
+      - backend-prod
+      - frontend-prod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API - Production Profile
+  backend-prod:
+    profiles: ["prod"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: bugrelay-backend-prod
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_SSLMODE=require
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_TOKEN_TTL=${JWT_ACCESS_TOKEN_TTL:-15m}
+      - JWT_REFRESH_TOKEN_TTL=${JWT_REFRESH_TOKEN_TTL:-168h}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL}
+      - ENVIRONMENT=production
+      - PORT=8080
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - LOG_OUTPUT=both
+      - LOGS_API_KEY=${LOGS_API_KEY}
+    volumes:
+      - backend_logs:/app/logs
+    networks:
+      - bugrelay
+      - monitoring
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend - Production Profile
+  frontend-prod:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: bugrelay-frontend-prod
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - BACKEND_LOGS_URL=http://backend-prod:8080
+      - BACKEND_API_KEY=${LOGS_API_KEY}
+      - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+      - NODE_ENV=production
+    volumes:
+      - frontend_logs:/app/logs
+    networks:
+      - bugrelay
+      - monitoring
+    depends_on:
+      - backend-prod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana for monitoring - Production Profile
+  grafana-prod:
+    profiles: ["prod"]
+    image: grafana/grafana:11.3.0
+    container_name: bugrelay-grafana-prod
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL}
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Prometheus for metrics - Production Profile
+  prometheus-prod:
+    profiles: ["prod"]
+    image: prom/prometheus:v2.55.0
+    container_name: bugrelay-prometheus-prod
+    environment:
+      - ENVIRONMENT=production
+      - PROMETHEUS_SCRAPE_INTERVAL=30s
+      - PROMETHEUS_EVALUATION_INTERVAL=30s
+      - PROMETHEUS_CLUSTER=bugrelay-prod
+      - PROMETHEUS_SELF_SCRAPE_INTERVAL=60s
+      - BACKEND_TARGET=backend-prod:8080
+      - FRONTEND_TARGET=frontend-prod:3000
+      - NGINX_TARGET=nginx:9113
+      - POSTGRES_TARGET=postgres-exporter:9187
+      - REDIS_TARGET=redis-exporter:9121
+      - BACKEND_SCRAPE_INTERVAL=30s
+      - FRONTEND_SCRAPE_INTERVAL=60s
+      - LOKI_SCRAPE_INTERVAL=60s
+      - GRAFANA_SCRAPE_INTERVAL=60s
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Loki for log aggregation - Production Profile
+  loki-prod:
+    profiles: ["prod"]
+    image: grafana/loki:3.2.0
+    container_name: bugrelay-loki-prod
+    environment:
+      - LOKI_CACHE_SIZE_MB=500
+      - LOKI_RETENTION_PERIOD=30d
+      - LOKI_MAX_QUERY_SERIES=100000
+      - LOKI_MAX_QUERY_PARALLELISM=32
+      - LOKI_COMPACTION_INTERVAL=10m
+      - LOKI_RETENTION_ENABLED=true
+      - LOKI_RETENTION_DELETE_DELAY=2h
+      - LOKI_RETENTION_DELETE_WORKER_COUNT=150
+    command: -config.file=/etc/loki/local-config.yaml -config.expand-env=true
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Promtail for log collection - Production Profile
+  promtail-prod:
+    profiles: ["prod"]
+    image: grafana/promtail:3.2.0
+    container_name: bugrelay-promtail-prod
+    environment:
+      - ENVIRONMENT=production
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml
+      - backend_logs:/var/log/bugrelay
+      - frontend_logs:/var/log/frontend
+      - nginx_logs:/var/log/nginx
+      - /var/log:/var/log/host:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - loki-prod
+
+  # AlertManager for alerting - Production Profile
+  alertmanager-prod:
+    profiles: ["prod"]
+    image: prom/alertmanager:v0.27.0
+    container_name: bugrelay-alertmanager-prod
+    environment:
+      - ENVIRONMENT=production
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_FROM=${SMTP_FROM:-alerts@bugrelay.com}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_REQUIRE_TLS=${SMTP_REQUIRE_TLS:-true}
+      - ALERT_GROUP_WAIT=30s
+      - ALERT_GROUP_INTERVAL=5m
+      - ALERT_REPEAT_INTERVAL=4h
+      - CRITICAL_GROUP_WAIT=10s
+      - CRITICAL_REPEAT_INTERVAL=30m
+      - WARNING_GROUP_WAIT=2m
+      - WARNING_REPEAT_INTERVAL=2h
+      - DEFAULT_EMAIL_TO=${DEFAULT_EMAIL_TO:-ops-team@bugrelay.com}
+      - CRITICAL_EMAIL_TO=${CRITICAL_EMAIL_TO:-ops-team@bugrelay.com,engineering@bugrelay.com}
+      - DATABASE_EMAIL_TO=${DATABASE_EMAIL_TO:-dba-team@bugrelay.com,ops-team@bugrelay.com}
+      - SECURITY_EMAIL_TO=${SECURITY_EMAIL_TO:-security-team@bugrelay.com,ops-team@bugrelay.com}
+      - WARNING_EMAIL_TO=${WARNING_EMAIL_TO:-ops-team@bugrelay.com}
+      - MONITORING_EMAIL_TO=${MONITORING_EMAIL_TO:-ops-team@bugrelay.com}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - SLACK_CRITICAL_CHANNEL=${SLACK_CRITICAL_CHANNEL:-#alerts-critical}
+      - SLACK_DATABASE_CHANNEL=${SLACK_DATABASE_CHANNEL:-#database-alerts}
+      - SLACK_SECURITY_CHANNEL=${SLACK_SECURITY_CHANNEL:-#security-alerts}
+      - SLACK_WARNING_CHANNEL=${SLACK_WARNING_CHANNEL:-#alerts-warning}
+      - PAGERDUTY_INTEGRATION_KEY=${PAGERDUTY_INTEGRATION_KEY}
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=${ALERTMANAGER_EXTERNAL_URL}'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Node Exporter for system metrics - Production Profile
+  node-exporter-prod:
+    profiles: ["prod"]
+    image: prom/node-exporter:v1.8.2
+    container_name: bugrelay-node-exporter-prod
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # cAdvisor for container metrics - Production Profile
+  cadvisor-prod:
+    profiles: ["prod"]
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: bugrelay-cadvisor-prod
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Database backup service - Production Profile
+  backup:
+    profiles: ["prod"]
+    image: postgres:17.0-alpine
+    container_name: bugrelay-backup-prod
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+    volumes:
+      - ./backup:/backup
+      - ./scripts/backup.sh:/backup.sh:ro
+    networks:
+      - bugrelay
+    depends_on:
+      - postgres
+    restart: no
+    command: >
+      sh -c "
+        echo 'Setting up backup cron job...' &&
+        echo '0 2 * * * /backup.sh' | crontab - &&
+        crond -f
+      "
 
 volumes:
   postgres_data:
   redis_data:
+  grafana_data:
+  loki_data:
+  prometheus_data:
+  alertmanager_data:
+  backend_logs:
+  frontend_logs:
+  nginx_logs:
+
+networks:
+  bugrelay:
+    driver: bridge
+  monitoring:
+    driver: bridge

@@ -46,18 +46,13 @@ Our comprehensive documentation system includes:
    ```bash
    git clone <repository-url>
    cd bugrelay
-   make setup
+   cp .env.example .env
    ```
 
 2. **Start the development environment:**
    ```bash
    # Start all services with Docker (recommended)
-   make docker-up
-   
-   # Or run services individually in separate terminals
-   make dev-frontend
-   make dev-backend
-   make dev-docs        # Start documentation server
+   make dev
    ```
 
 3. **Access the application:**
@@ -71,7 +66,7 @@ Our comprehensive documentation system includes:
 Copy the example environment file and configure as needed:
 
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
 Key environment variables:
@@ -82,43 +77,22 @@ Key environment variables:
 ### Available Commands
 
 ```bash
-# Setup
-make setup               # Install all dependencies
-make setup-frontend      # Install frontend dependencies only
-make setup-backend       # Install backend dependencies only
+# Core Commands
+make dev                 # Start development environment with hot reload
+make prod                # Start production environment
+make stop                # Stop all services
+make clean               # Remove containers and volumes
+make logs                # View logs from all services
+make shell               # Access backend shell for debugging
 
-# Development
-make dev-frontend        # Start frontend development server
-make dev-backend         # Start backend development server
-make dev-docs            # Start documentation development server
-
-# Docker
-make docker-up           # Start all services with Docker
-make docker-down         # Stop all Docker services
-
-# Build
-make build               # Build both frontend and backend
-make build-frontend      # Build frontend only
-make build-backend       # Build backend only
-make build-docs          # Build documentation site
+# Development Utilities
+make seed                # Seed database with sample data
+make migrate             # Run database migrations
+make test                # Run all tests
+make build               # Build production images
 
 # Documentation
-make docs-generate       # Generate API docs from codebase
-make docs-validate       # Validate generated documentation
-make docs-test           # Run documentation tests
-
-# Database
-make db-migrate-up       # Run database migrations
-make db-migrate-down     # Rollback database migrations
-
-# Testing & Linting
-make test-frontend       # Run frontend tests
-make test-backend        # Run backend tests
-make lint-frontend       # Type check frontend
-make lint-backend        # Lint and format backend
-
-# Utilities
-make clean               # Clean build artifacts
+make docs                # Start documentation server
 make help                # Show all available commands
 ```
 
@@ -212,6 +186,29 @@ npm run dev
 - **📱 Mobile App**: Native mobile applications
 - **🌐 API Versioning**: Multiple API versions support
 - **🔒 Advanced Security**: Rate limiting, CAPTCHA, and abuse prevention
+
+## Migration Guide for Existing Developers
+
+If you've been working with the previous setup, here's what changed:
+
+### What's New
+- **Single Docker Compose file**: Replaced multiple `docker-compose.*.yml` files
+- **Unified environment**: Single `.env` file instead of separate backend/.env
+- **Simplified commands**: Use `make dev` instead of complex script combinations
+- **Profile-based deployment**: Development and production use the same compose file with different profiles
+
+### Migration Steps
+1. **Clean up old setup**: Run `make clean` to remove old containers
+2. **Update environment**: Copy `.env.example` to `.env` and configure
+3. **Use new commands**: 
+   - Old: `./scripts/dev-start.sh` → New: `make dev`
+   - Old: `./scripts/deploy-prod.sh` → New: `make prod`
+   - Old: `docker-compose -f docker-compose.dev.yml down` → New: `make stop`
+
+### Removed Files
+- `docker-compose.dev.yml` and `docker-compose.prod.yml` (consolidated into single file)
+- `scripts/dev-start.sh`, `scripts/dev-stop.sh`, `scripts/deploy-prod.sh`, `scripts/setup-dev.sh`
+- `backend/.env` (moved to root `.env`)
 
 ## Contributing
 

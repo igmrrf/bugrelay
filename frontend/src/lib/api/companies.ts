@@ -32,11 +32,16 @@ export const companiesAPI = {
     
     if (filters.search) params.append('search', filters.search)
     if (filters.verified !== undefined) params.append('verified', filters.verified.toString())
-    if (filters.sortBy) params.append('sortBy', filters.sortBy)
+    // Note: sortBy is not supported by the backend yet
     if (filters.page) params.append('page', filters.page.toString())
     if (filters.limit) params.append('limit', filters.limit.toString())
 
-    return apiClient.get(`/companies?${params.toString()}`)
+    const response = await apiClient.get<{companies: Company[], pagination: any}>(`/companies/?${params.toString()}`)
+    return {
+      companies: response.companies,
+      totalCount: response.pagination.total,
+      hasNextPage: response.pagination.has_next
+    }
   },
 
   get: async (id: string): Promise<Company> => {

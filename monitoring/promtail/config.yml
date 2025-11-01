@@ -17,6 +17,7 @@ scrape_configs:
         labels:
           job: bugrelay-backend
           service: backend
+          environment: ${ENVIRONMENT:-development}
           __path__: /var/log/bugrelay/*.log
     pipeline_stages:
       - json:
@@ -30,6 +31,10 @@ scrape_configs:
             path: path
             status_code: status_code
             duration_ms: duration_ms
+            context: context
+            audit: audit
+            security: security
+            performance: performance
       - timestamp:
           source: timestamp
           format: RFC3339
@@ -38,8 +43,9 @@ scrape_configs:
           service:
           method:
           status_code:
+          environment:
 
-  # Frontend Logs (Next.js)
+  # Frontend Logs
   - job_name: bugrelay-frontend
     static_configs:
       - targets:
@@ -47,37 +53,77 @@ scrape_configs:
         labels:
           job: bugrelay-frontend
           service: frontend
+          environment: ${ENVIRONMENT:-development}
           __path__: /var/log/frontend/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            context: context
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          level:
+          service:
+          environment:
 
-  # System Logs
-  - job_name: system
+  # Nginx Logs (Production only)
+  - job_name: nginx-access
     static_configs:
       - targets:
           - localhost
         labels:
-          job: system
-          __path__: /var/log/host/syslog
+          job: nginx
+          service: nginx
+          log_type: access
+          environment: ${ENVIRONMENT:-development}
+          __path__: /var/log/nginx/access.log
     pipeline_stages:
       - regex:
-          expression: '^(?P<timestamp>\S+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s+(?P<message>.*)$'
-      - timestamp:
-          source: timestamp
-          format: Jan 2 15:04:05
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" "(?P<http_x_forwarded_for>[^"]*)" rt=(?P<request_time>\S+) uct="(?P<upstream_connect_time>\S+)" uht="(?P<upstream_header_time>\S+)" urt="(?P<upstream_response_time>\S+)"'
       - labels:
-          hostname:
+          method:
+          status:
           service:
+          environment:
+
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          log_type: error
+          environment: ${ENVIRONMENT:-development}
+          __path__: /var/log/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<pid>\d+)#(?P<tid>\d+): (?P<message>.*)'
+      - labels:
+          level:
+          service:
+          environment:
 
   # Docker Container Logs
-  - job_name: docker
+  - job_name: docker-containers
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=bugrelay"]
     relabel_configs:
       - source_labels: ['__meta_docker_container_name']
         regex: '/(.+)'
         target_label: 'container_name'
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'stream'
+      - target_label: 'environment'
+        replacement: '${ENVIRONMENT:-development}'
     pipeline_stages:
       - json:
           expressions:
@@ -90,6 +136,26 @@ scrape_configs:
       - output:
           source: output
 
+  # System Logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          environment: ${ENVIRONMENT:-development}
+          __path__: /var/log/host/syslog
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\S+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s+(?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: Jan 2 15:04:05
+      - labels:
+          hostname:
+          service:
+          environment:
+
   # Audit Logs (Security Events)
   - job_name: audit-logs
     static_configs:
@@ -98,6 +164,7 @@ scrape_configs:
         labels:
           job: audit-logs
           service: security
+          environment: ${ENVIRONMENT:-development}
           __path__: /var/log/bugrelay/audit.log
     pipeline_stages:
       - json:
@@ -120,3 +187,4 @@ scrape_configs:
           resource:
           severity:
           event:
+          environment:

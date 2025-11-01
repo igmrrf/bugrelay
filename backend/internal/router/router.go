@@ -1,12 +1,14 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"bugrelay-backend/internal/auth"
 	"bugrelay-backend/internal/config"
 	"bugrelay-backend/internal/handlers"
+	"bugrelay-backend/internal/logger"
 	"bugrelay-backend/internal/middleware"
 
 	"github.com/gin-contrib/cors"
@@ -44,6 +46,25 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 	if cfg.Server.Environment == "production" {
 		r.Use(securityMiddleware.ValidateUserAgent())
 	}
+	r.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin == "" {
+			origin = "unknown"
+		}
+
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		clientIP := c.ClientIP()
+
+		logger.Info("Starting BugRelay backend", logger.Fields{
+			"method":   method,
+			"origin":   origin,
+			"clientIp": clientIP,
+			"path":     path,
+			"env":      cfg.Server.Environment,
+		})
+		c.Next()
+	})
 
 	// CORS configuration with enhanced security
 	corsConfig := cors.Config{
@@ -79,7 +100,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 			"X-RateLimit-Reset",
 		},
 		AllowCredentials: true,
-		MaxAge:          12 * time.Hour,
+		MaxAge:           12 * time.Hour,
 	}
 	r.Use(cors.New(corsConfig))
 
@@ -110,7 +131,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 	companyHandler := handlers.NewCompanyHandler(db)
 	adminHandler := handlers.NewAdminHandler(db)
 	logsHandler := handlers.NewLogsHandler()
-	
+
 	// Initialize rate limiter
 	rateLimiter := middleware.NewRateLimiter(redisClient, 60)
 
@@ -142,11 +163,11 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
 			auth.GET("/verify-email", authHandler.VerifyEmail)
-			
+
 			// Password reset endpoints
 			auth.POST("/password-reset", authHandler.RequestPasswordReset)
 			auth.POST("/password-reset/confirm", authHandler.ResetPassword)
-			
+
 			// OAuth endpoints
 			oauth := auth.Group("/oauth")
 			{
@@ -154,7 +175,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 				oauth.GET("/callback/:provider", oauthHandler.HandleOAuthCallback)
 				oauth.POST("/link/:provider", authMiddleware.RequireAuth(), oauthHandler.LinkOAuthAccount)
 			}
-			
+
 			// Protected authentication endpoints
 			auth.POST("/logout", authMiddleware.RequireAuth(), authHandler.Logout)
 			auth.POST("/logout-all", authMiddleware.RequireAuth(), authHandler.LogoutAll)
@@ -182,7 +203,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 			bugs.GET("/", bugHandler.ListBugs)
 			bugs.GET("/:id", bugHandler.GetBug)
 			bugs.POST("/", rateLimiter.BugSubmissionRateLimit(), authMiddleware.OptionalAuth(), bugHandler.CreateBug)
-			
+
 			// Protected bug endpoints
 			bugs.POST("/:id/vote", authMiddleware.RequireAuth(), bugHandler.VoteBug)
 			bugs.POST("/:id/comments", authMiddleware.RequireAuth(), bugHandler.CreateComment)
@@ -197,7 +218,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 			// Public company endpoints
 			companies.GET("/", companyHandler.ListCompanies)
 			companies.GET("/:id", companyHandler.GetCompany)
-			
+
 			// Protected company endpoints
 			companies.POST("/:id/claim", authMiddleware.RequireAuth(), companyHandler.InitiateCompanyClaim)
 			companies.POST("/:id/verify", authMiddleware.RequireAuth(), companyHandler.CompleteCompanyVerification)
@@ -218,14 +239,14 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 		{
 			// Dashboard and statistics
 			admin.GET("/dashboard", adminHandler.GetAdminDashboard)
-			
+
 			// Bug moderation
 			admin.GET("/bugs", adminHandler.ListBugsForModeration)
 			admin.POST("/bugs/:id/flag", adminHandler.FlagBug)
 			admin.DELETE("/bugs/:id", adminHandler.RemoveBug)
 			admin.POST("/bugs/:id/restore", adminHandler.RestoreBug)
 			admin.POST("/bugs/merge", adminHandler.MergeBugs)
-			
+
 			// Audit logs
 			admin.GET("/audit-logs", adminHandler.GetAuditLogs)
 		}
@@ -235,7 +256,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 		{
 			// Health check for logging system
 			logs.GET("/health", logsHandler.GetLogsHealth)
-			
+
 			// Frontend logs endpoint (with API key protection)
 			logs.POST("/frontend", func(c *gin.Context) {
 				// Simple API key check for development
@@ -251,3 +272,4 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 
 	return r
 }
+

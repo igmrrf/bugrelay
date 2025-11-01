@@ -1,57 +1,100 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Upload, X, Plus, AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoadingSpinner } from "@/components/ui/loading"
+import { AlertCircle, Upload, X } from "lucide-react";
+import Image from "next/image";
+import * as React from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { LoadingSpinner } from "@/components/ui/loading";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface BugSubmissionFormProps {
-  onSubmit?: (data: BugSubmissionData) => Promise<void>
-  isLoading?: boolean
-  error?: string
-  success?: boolean
+  onSubmit?: (data: BugSubmissionData) => Promise<void>;
+  isLoading?: boolean;
+  error?: string;
+  success?: boolean;
 }
 
 export interface BugSubmissionData {
-  title: string
-  description: string
-  applicationName: string
-  applicationUrl?: string
-  priority: "low" | "medium" | "high" | "critical"
-  tags: string[]
-  operatingSystem?: string
-  deviceType?: string
-  appVersion?: string
-  browserVersion?: string
-  screenshots: File[]
-  contactEmail?: string
+  title: string;
+  description: string;
+  applicationName: string;
+  applicationUrl?: string;
+  priority: "low" | "medium" | "high" | "critical";
+  tags: string[];
+  operatingSystem?: string;
+  deviceType?: string;
+  appVersion?: string;
+  browserVersion?: string;
+  screenshots: File[];
+  contactEmail?: string;
 }
 
 const priorityOptions = [
-  { value: "low", label: "Low", description: "Minor issue that doesn't affect core functionality" },
-  { value: "medium", label: "Medium", description: "Issue affects functionality but has workarounds" },
-  { value: "high", label: "High", description: "Major issue that significantly impacts functionality" },
-  { value: "critical", label: "Critical", description: "Severe issue that makes the app unusable" }
-]
+  {
+    value: "low",
+    label: "Low",
+    description: "Minor issue that doesn't affect core functionality",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "Issue affects functionality but has workarounds",
+  },
+  {
+    value: "high",
+    label: "High",
+    description: "Major issue that significantly impacts functionality",
+  },
+  {
+    value: "critical",
+    label: "Critical",
+    description: "Severe issue that makes the app unusable",
+  },
+];
 
 const tagOptions = [
-  "UI", "Crash", "Performance", "Security", "Accessibility", 
-  "Mobile", "Desktop", "Web", "Data Loss", "Login", "Payment"
-]
+  "UI",
+  "Crash",
+  "Performance",
+  "Security",
+  "Accessibility",
+  "Mobile",
+  "Desktop",
+  "Web",
+  "Data Loss",
+  "Login",
+  "Payment",
+];
 
 const deviceTypeOptions = [
-  "Desktop", "Mobile", "Tablet", "Smart TV", "Wearable", "Other"
-]
+  "Desktop",
+  "Mobile",
+  "Tablet",
+  "Smart TV",
+  "Wearable",
+  "Other",
+];
 
 export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
   onSubmit,
   isLoading = false,
   error,
-  success = false
+  success = false,
 }) => {
   const [formData, setFormData] = React.useState<BugSubmissionData>({
     title: "",
@@ -65,127 +108,130 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
     appVersion: "",
     browserVersion: "",
     screenshots: [],
-    contactEmail: ""
-  })
-  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<keyof BugSubmissionData, string>>>({})
-  const [dragActive, setDragActive] = React.useState(false)
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
+    contactEmail: "",
+  });
+  const [fieldErrors, setFieldErrors] = React.useState<
+    Partial<Record<keyof BugSubmissionData, string>>
+  >({});
+  const [dragActive, setDragActive] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof BugSubmissionData, string>> = {}
-    
+    const errors: Partial<Record<keyof BugSubmissionData, string>> = {};
+
     if (!formData.title.trim()) {
-      errors.title = "Title is required"
+      errors.title = "Title is required";
     } else if (formData.title.trim().length < 10) {
-      errors.title = "Title must be at least 10 characters"
+      errors.title = "Title must be at least 10 characters";
     }
-    
+
     if (!formData.description.trim()) {
-      errors.description = "Description is required"
+      errors.description = "Description is required";
     } else if (formData.description.trim().length < 20) {
-      errors.description = "Description must be at least 20 characters"
+      errors.description = "Description must be at least 20 characters";
     }
-    
+
     if (!formData.applicationName.trim()) {
-      errors.applicationName = "Application name is required"
+      errors.applicationName = "Application name is required";
     }
-    
+
     if (formData.applicationUrl && !isValidUrl(formData.applicationUrl)) {
-      errors.applicationUrl = "Please enter a valid URL"
+      errors.applicationUrl = "Please enter a valid URL";
     }
-    
+
     if (formData.contactEmail && !isValidEmail(formData.contactEmail)) {
-      errors.contactEmail = "Please enter a valid email address"
+      errors.contactEmail = "Please enter a valid email address";
     }
-    
+
     if (formData.screenshots.length > 5) {
-      errors.screenshots = "Maximum 5 screenshots allowed"
+      errors.screenshots = "Maximum 5 screenshots allowed";
     }
-    
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const isValidUrl = (string: string): boolean => {
     try {
-      new URL(string)
-      return true
+      new URL(string);
+      return true;
     } catch (_) {
-      return false
+      return false;
     }
-  }
+  };
 
   const isValidEmail = (email: string): boolean => {
-    return /\S+@\S+\.\S+/.test(email)
-  }
+    return /\S+@\S+\.\S+/.test(email);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm() || !onSubmit) return
-    
+    e.preventDefault();
+
+    if (!validateForm() || !onSubmit) return;
+
     try {
-      await onSubmit(formData)
+      await onSubmit(formData);
     } catch (err) {
       // Error handling is managed by parent component
     }
-  }
+  };
 
   const handleInputChange = (field: keyof BugSubmissionData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
-  }
+  };
 
   const handleTagToggle = (tag: string) => {
     const newTags = formData.tags.includes(tag)
-      ? formData.tags.filter(t => t !== tag)
-      : [...formData.tags, tag]
-    handleInputChange("tags", newTags)
-  }
+      ? formData.tags.filter((t) => t !== tag)
+      : [...formData.tags, tag];
+    handleInputChange("tags", newTags);
+  };
 
   const handleFileUpload = (files: FileList | null) => {
-    if (!files) return
-    
-    const validFiles = Array.from(files).filter(file => {
-      if (!file.type.startsWith('image/')) {
-        alert(`${file.name} is not an image file`)
-        return false
+    if (!files) return;
+
+    const validFiles = Array.from(files).filter((file) => {
+      if (!file.type.startsWith("image/")) {
+        alert(`${file.name} is not an image file`);
+        return false;
       }
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert(`${file.name} is too large (max 10MB)`)
-        return false
+      if (file.size > 10 * 1024 * 1024) {
+        // 10MB limit
+        alert(`${file.name} is too large (max 10MB)`);
+        return false;
       }
-      return true
-    })
-    
-    const newScreenshots = [...formData.screenshots, ...validFiles].slice(0, 5)
-    handleInputChange("screenshots", newScreenshots)
-  }
+      return true;
+    });
+
+    const newScreenshots = [...formData.screenshots, ...validFiles].slice(0, 5);
+    handleInputChange("screenshots", newScreenshots);
+  };
 
   const removeScreenshot = (index: number) => {
-    const newScreenshots = formData.screenshots.filter((_, i) => i !== index)
-    handleInputChange("screenshots", newScreenshots)
-  }
+    const newScreenshots = formData.screenshots.filter((_, i) => i !== index);
+    handleInputChange("screenshots", newScreenshots);
+  };
 
   const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
+      setDragActive(true);
     } else if (e.type === "dragleave") {
-      setDragActive(false)
+      setDragActive(false);
     }
-  }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    handleFileUpload(e.dataTransfer.files)
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    handleFileUpload(e.dataTransfer.files);
+  };
 
   if (success) {
     return (
@@ -194,45 +240,57 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <AlertCircle className="h-6 w-6 text-green-600" />
           </div>
-          <CardTitle className="text-2xl font-bold">Bug report submitted!</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Bug report submitted!
+          </CardTitle>
           <CardDescription>
-            Thank you for helping improve software quality. Your bug report has been submitted successfully.
+            Thank you for helping improve software quality. Your bug report has
+            been submitted successfully.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground text-center space-y-2">
             <p>
-              Your bug report is now public and can be viewed by other users and the application's developers.
+              Your bug report is now public and can be viewed by other users and
+              the application's developers.
             </p>
             <p>
-              You'll receive email notifications if there are updates to your report.
+              You'll receive email notifications if there are updates to your
+              report.
             </p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-2">
             <Button asChild className="flex-1">
               <a href="/bugs">View All Bugs</a>
             </Button>
-            <Button variant="outline" onClick={() => window.location.reload()} className="flex-1">
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="flex-1"
+            >
               Submit Another Bug
             </Button>
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold">Submit a Bug Report</CardTitle>
+        <CardTitle className="text-2xl font-bold">
+          Submit a Bug Report
+        </CardTitle>
         <CardDescription>
-          Help improve software quality by reporting bugs you've encountered. 
-          Provide as much detail as possible to help developers understand and fix the issue.
+          Help improve software quality by reporting bugs you've encountered.
+          Provide as much detail as possible to help developers understand and
+          fix the issue.
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         {/* Error Message */}
         {error && (
@@ -245,7 +303,7 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Basic Information</h3>
-            
+
             <div className="space-y-2">
               <label htmlFor="title" className="text-sm font-medium">
                 Bug Title *
@@ -271,13 +329,17 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                 id="description"
                 placeholder="Detailed description of the bug, including steps to reproduce, expected behavior, and actual behavior"
                 value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
                 disabled={isLoading}
                 rows={6}
                 className={fieldErrors.description ? "border-destructive" : ""}
               />
               {fieldErrors.description && (
-                <p className="text-sm text-destructive">{fieldErrors.description}</p>
+                <p className="text-sm text-destructive">
+                  {fieldErrors.description}
+                </p>
               )}
               <p className="text-xs text-muted-foreground">
                 {formData.description.length}/2000 characters
@@ -288,22 +350,31 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
           {/* Application Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Application Information</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="applicationName" className="text-sm font-medium">
+                <label
+                  htmlFor="applicationName"
+                  className="text-sm font-medium"
+                >
                   Application Name *
                 </label>
                 <Input
                   id="applicationName"
                   placeholder="e.g. Gmail, Slack, Instagram"
                   value={formData.applicationName}
-                  onChange={(e) => handleInputChange("applicationName", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("applicationName", e.target.value)
+                  }
                   disabled={isLoading}
-                  className={fieldErrors.applicationName ? "border-destructive" : ""}
+                  className={
+                    fieldErrors.applicationName ? "border-destructive" : ""
+                  }
                 />
                 {fieldErrors.applicationName && (
-                  <p className="text-sm text-destructive">{fieldErrors.applicationName}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.applicationName}
+                  </p>
                 )}
               </div>
 
@@ -316,12 +387,18 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                   type="url"
                   placeholder="https://example.com"
                   value={formData.applicationUrl}
-                  onChange={(e) => handleInputChange("applicationUrl", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("applicationUrl", e.target.value)
+                  }
                   disabled={isLoading}
-                  className={fieldErrors.applicationUrl ? "border-destructive" : ""}
+                  className={
+                    fieldErrors.applicationUrl ? "border-destructive" : ""
+                  }
                 />
                 {fieldErrors.applicationUrl && (
-                  <p className="text-sm text-destructive">{fieldErrors.applicationUrl}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.applicationUrl}
+                  </p>
                 )}
               </div>
             </div>
@@ -330,9 +407,11 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
           {/* Bug Classification */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Bug Classification</h3>
-            
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Priority</label>
+              <label htmlFor="priority" className="text-sm font-medium">
+                Priority
+              </label>
               <Select
                 value={formData.priority}
                 onValueChange={(value) => handleInputChange("priority", value)}
@@ -345,7 +424,9 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                     <SelectItem key={option.value} value={option.value}>
                       <div>
                         <div className="font-medium">{option.label}</div>
-                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {option.description}
+                        </div>
                       </div>
                     </SelectItem>
                   ))}
@@ -354,13 +435,18 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Tags</label>
+              <label htmlFor="handle-tag" className="text-sm font-medium">
+                Tags
+              </label>
               <div className="flex flex-wrap gap-2">
                 {tagOptions.map((tag) => (
                   <Button
                     key={tag}
                     type="button"
-                    variant={formData.tags.includes(tag) ? "default" : "outline"}
+                    id="handle-tag"
+                    variant={
+                      formData.tags.includes(tag) ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => handleTagToggle(tag)}
                     disabled={isLoading}
@@ -374,18 +460,25 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
 
           {/* Technical Details */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Technical Details (Optional)</h3>
-            
+            <h3 className="text-lg font-semibold">
+              Technical Details (Optional)
+            </h3>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="operatingSystem" className="text-sm font-medium">
+                <label
+                  htmlFor="operatingSystem"
+                  className="text-sm font-medium"
+                >
                   Operating System
                 </label>
                 <Input
                   id="operatingSystem"
                   placeholder="e.g. Windows 11, macOS 14, iOS 17"
                   value={formData.operatingSystem}
-                  onChange={(e) => handleInputChange("operatingSystem", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("operatingSystem", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -396,7 +489,9 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                 </label>
                 <Select
                   value={formData.deviceType}
-                  onValueChange={(value) => handleInputChange("deviceType", value)}
+                  onValueChange={(value) =>
+                    handleInputChange("deviceType", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select device type" />
@@ -419,7 +514,9 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                   id="appVersion"
                   placeholder="e.g. 2.1.4, v1.0.0"
                   value={formData.appVersion}
-                  onChange={(e) => handleInputChange("appVersion", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("appVersion", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -432,7 +529,9 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                   id="browserVersion"
                   placeholder="e.g. Chrome 119, Safari 17"
                   value={formData.browserVersion}
-                  onChange={(e) => handleInputChange("browserVersion", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("browserVersion", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -442,10 +541,12 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
           {/* Screenshots */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Screenshots (Optional)</h3>
-            
+
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                dragActive
+                  ? "border-primary bg-primary/5"
+                  : "border-muted-foreground/25"
               } ${fieldErrors.screenshots ? "border-destructive" : ""}`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -477,15 +578,17 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
             </div>
 
             {fieldErrors.screenshots && (
-              <p className="text-sm text-destructive">{fieldErrors.screenshots}</p>
+              <p className="text-sm text-destructive">
+                {fieldErrors.screenshots}
+              </p>
             )}
 
             {/* Screenshot Preview */}
             {formData.screenshots.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {formData.screenshots.map((file, index) => (
-                  <div key={index} className="relative group">
-                    <img
+                  <div key={file.name} className="relative group">
+                    <Image
                       src={URL.createObjectURL(file)}
                       alt={`Screenshot ${index + 1}`}
                       className="w-full h-24 object-cover rounded-lg border"
@@ -510,8 +613,10 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
 
           {/* Contact Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Contact Information (Optional)</h3>
-            
+            <h3 className="text-lg font-semibold">
+              Contact Information (Optional)
+            </h3>
+
             <div className="space-y-2">
               <label htmlFor="contactEmail" className="text-sm font-medium">
                 Email Address
@@ -521,12 +626,16 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
                 type="email"
                 placeholder="your.email@example.com"
                 value={formData.contactEmail}
-                onChange={(e) => handleInputChange("contactEmail", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("contactEmail", e.target.value)
+                }
                 disabled={isLoading}
                 className={fieldErrors.contactEmail ? "border-destructive" : ""}
               />
               {fieldErrors.contactEmail && (
-                <p className="text-sm text-destructive">{fieldErrors.contactEmail}</p>
+                <p className="text-sm text-destructive">
+                  {fieldErrors.contactEmail}
+                </p>
               )}
               <p className="text-xs text-muted-foreground">
                 Optional: Receive updates about this bug report
@@ -553,5 +662,6 @@ export const BugSubmissionForm: React.FC<BugSubmissionFormProps> = ({
         </form>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
+

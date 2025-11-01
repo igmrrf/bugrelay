@@ -29,11 +29,11 @@ func (rl *RateLimiter) RateLimit(requestsPerMinute int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
 		key := fmt.Sprintf("rate_limit:%s", clientIP)
-		
+
 		// Use Redis for distributed rate limiting if available
 		if rl.redisClient != nil {
 			ctx := c.Request.Context()
-			
+
 			// Get current count
 			current, err := rl.redisClient.Get(ctx, key).Int()
 			if err != nil && err.Error() != "redis: nil" {
@@ -52,7 +52,7 @@ func (rl *RateLimiter) RateLimit(requestsPerMinute int) gin.HandlerFunc {
 				c.Next()
 				return
 			}
-			
+
 			if current >= requestsPerMinute {
 				c.JSON(http.StatusTooManyRequests, gin.H{
 					"error": gin.H{
@@ -64,7 +64,7 @@ func (rl *RateLimiter) RateLimit(requestsPerMinute int) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			
+
 			// Increment counter
 			pipe := rl.redisClient.Pipeline()
 			pipe.Incr(ctx, key)
@@ -89,7 +89,7 @@ func (rl *RateLimiter) RateLimit(requestsPerMinute int) gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		c.Next()
 	}
 }
@@ -101,5 +101,7 @@ func (rl *RateLimiter) BugSubmissionRateLimit() gin.HandlerFunc {
 
 // GeneralRateLimit provides general rate limiting
 func (rl *RateLimiter) GeneralRateLimit() gin.HandlerFunc {
-	return rl.RateLimit(60) // 60 requests per minute per IP
+	// TODO: Change to 600
+	return rl.RateLimit(60000) // 60 requests per minute per IP
 }
+

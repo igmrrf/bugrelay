@@ -46,15 +46,15 @@ git clone https://github.com/your-org/bugrelay.git
 cd bugrelay
 
 # Copy environment configuration
-cp .env.prod.example .env.prod
+cp .env.example .env
 
 # Edit the configuration file
-nano .env.prod
+nano .env
 ```
 
 ### 2. Configure Environment
 
-Edit `.env.prod` with your production values:
+Edit `.env` with your production values:
 
 ```bash
 # Database
@@ -93,11 +93,8 @@ cp your-domain.key ssl/bugrelay.com.key
 ### 4. Deploy
 
 ```bash
-# Make scripts executable
-chmod +x scripts/*.sh
-
 # Deploy to production
-./scripts/deploy-prod.sh
+make prod
 ```
 
 ## 🔧 Detailed Configuration
@@ -216,11 +213,11 @@ Backups run automatically every day at 2 AM UTC:
 
 ```bash
 # Manual backup
-docker-compose -f docker-compose.prod.yml exec postgres \
+docker-compose exec postgres \
   pg_dump -U bugrelay_user -d bugrelay_production > backup/manual_backup.sql
 
 # Restore from backup
-docker-compose -f docker-compose.prod.yml exec -T postgres \
+docker-compose exec -T postgres \
   psql -U bugrelay_user -d bugrelay_production < backup/backup_file.sql
 ```
 
@@ -241,14 +238,14 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 #### Database Recovery
 ```bash
 # Stop application
-docker-compose -f docker-compose.prod.yml stop backend frontend
+make stop
 
 # Restore database
-docker-compose -f docker-compose.prod.yml exec -T postgres \
+docker-compose exec -T postgres \
   psql -U bugrelay_user -d bugrelay_production < backup/restore_file.sql
 
 # Start application
-docker-compose -f docker-compose.prod.yml start backend frontend
+make prod
 ```
 
 #### Full System Recovery
@@ -258,10 +255,10 @@ git clone https://github.com/your-org/bugrelay.git
 cd bugrelay
 
 # Restore configuration
-cp backup/.env.prod .env.prod
+cp backup/.env .env
 
 # Deploy
-./scripts/deploy-prod.sh
+make prod
 
 # Restore database
 # (follow database recovery steps above)
@@ -333,20 +330,19 @@ CREATE INDEX CONCURRENTLY idx_comments_bug_id ON comments(bug_id);
 #### Application Won't Start
 ```bash
 # Check logs
-docker-compose -f docker-compose.prod.yml logs backend
-docker-compose -f docker-compose.prod.yml logs frontend
+make logs
 
 # Check service status
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 ```
 
 #### Database Connection Issues
 ```bash
 # Check database logs
-docker-compose -f docker-compose.prod.yml logs postgres
+docker-compose logs postgres
 
 # Test database connection
-docker-compose -f docker-compose.prod.yml exec postgres \
+docker-compose exec postgres \
   psql -U bugrelay_user -d bugrelay_production -c "SELECT 1;"
 ```
 
@@ -359,17 +355,17 @@ docker stats
 free -h
 
 # Restart services if needed
-docker-compose -f docker-compose.prod.yml restart
+make stop && make prod
 ```
 
 ### Log Analysis
 
 ```bash
 # View application logs
-docker-compose -f docker-compose.prod.yml logs -f backend frontend
+make logs
 
 # View Nginx access logs
-docker-compose -f docker-compose.prod.yml exec nginx tail -f /var/log/nginx/access.log
+docker-compose exec nginx tail -f /var/log/nginx/access.log
 
 # View system logs
 journalctl -u docker -f
@@ -382,7 +378,7 @@ journalctl -u docker -f
 curl -w "@curl-format.txt" -o /dev/null -s "https://bugrelay.com/health"
 
 # Monitor database performance
-docker-compose -f docker-compose.prod.yml exec postgres \
+docker-compose exec postgres \
   psql -U bugrelay_user -d bugrelay_production -c "SELECT * FROM pg_stat_activity;"
 ```
 
@@ -410,14 +406,14 @@ docker-compose -f docker-compose.prod.yml exec postgres \
 ```bash
 # Update application
 git pull origin main
-./scripts/deploy-prod.sh
+make prod
 
 # Update system packages
 sudo apt update && sudo apt upgrade
 
 # Update Docker images
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose pull
+make prod
 ```
 
 ## 📞 Support

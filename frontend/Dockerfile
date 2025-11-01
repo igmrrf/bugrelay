@@ -1,28 +1,49 @@
-# Production Dockerfile for Next.js frontend
-FROM node:18-alpine AS base
+# Multi-stage Dockerfile for Next.js frontend (supports both dev and prod)
+FROM node:22-alpine AS base
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# Install necessary packages
+RUN apk add --no-cache libc6-compat git wget \
+    && apk upgrade --no-cache
+
+# Development stage
+FROM base AS development
 WORKDIR /app
+# Copy package files
+COPY package*.json ./
+# Install all dependencies (including dev dependencies)
+RUN npm ci --frozen-lockfile
+# Copy source code
+COPY . .
+# Create logs directory
+RUN mkdir -p logs
+# Expose port
+EXPOSE 3000
+# Default command for development
+CMD ["npm", "run", "dev"]
 
+# Dependencies stage for production
+FROM base AS deps
+WORKDIR /app
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci --only=production --frozen-lockfile
 
-# Rebuild the source code only when needed
+# Builder stage for production
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Build the application
+# Build the application with optimizations
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
 RUN npm run build
 
 # Production image, copy all the files and run next
-FROM base AS runner
+FROM base AS production
 WORKDIR /app
+
+# Install security updates
+RUN apk upgrade --no-cache
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
