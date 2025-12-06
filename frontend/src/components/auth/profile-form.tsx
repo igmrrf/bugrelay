@@ -1,185 +1,201 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Camera, Save, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoadingSpinner } from "@/components/ui/loading"
+import * as React from "react";
+import { Camera, Save, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { useAuthStore } from "@/lib/stores";
 
 interface ProfileFormProps {
-  user?: UserProfile
-  onSubmit?: (data: UserProfileData) => Promise<void>
-  onAvatarUpload?: (file: File) => Promise<string>
-  isLoading?: boolean
-  error?: string
-  success?: boolean
+  user?: UserProfile;
+  onSubmit?: (data: UserProfileData) => Promise<void>;
+  onAvatarUpload?: (file: File) => Promise<string>;
+  isLoading?: boolean;
+  error?: string;
+  success?: boolean;
 }
 
 export interface UserProfile {
-  id: string
-  name: string
-  email: string
-  avatar?: string
-  bio?: string
-  location?: string
-  website?: string
-  githubUsername?: string
-  twitterUsername?: string
-  createdAt: string
-  lastActiveAt: string
+  id: string;
+  displayName: string;
+  email: string;
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  githubUsername?: string;
+  twitterUsername?: string;
+  createdAt: string;
+  lastActiveAt: string;
 }
 
 export interface UserProfileData {
-  name: string
-  bio?: string
-  location?: string
-  website?: string
-  githubUsername?: string
-  twitterUsername?: string
+  displayName: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  githubUsername?: string;
+  twitterUsername?: string;
 }
 
 export const ProfileForm: React.FC<ProfileFormProps> = ({
-  user,
   onSubmit,
   onAvatarUpload,
   isLoading = false,
   error,
-  success = false
+  success = false,
 }) => {
+  const { user } = useAuthStore();
   const [formData, setFormData] = React.useState<UserProfileData>({
-    name: user?.name || "",
+    displayName: user?.displayName || "",
     bio: user?.bio || "",
     location: user?.location || "",
     website: user?.website || "",
     githubUsername: user?.githubUsername || "",
-    twitterUsername: user?.twitterUsername || ""
-  })
-  const [fieldErrors, setFieldErrors] = React.useState<Partial<UserProfileData>>({})
-  const [avatarUploading, setAvatarUploading] = React.useState(false)
-  const [hasChanges, setHasChanges] = React.useState(false)
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
+    twitterUsername: user?.twitterUsername || "",
+  });
+  const [fieldErrors, setFieldErrors] = React.useState<
+    Partial<UserProfileData>
+  >({});
+  const [avatarUploading, setAvatarUploading] = React.useState(false);
+  const [hasChanges, setHasChanges] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (user) {
       const newFormData = {
-        name: user.name || "",
+        displayName: user.displayName,
         bio: user.bio || "",
         location: user.location || "",
         website: user.website || "",
         githubUsername: user.githubUsername || "",
-        twitterUsername: user.twitterUsername || ""
-      }
-      setFormData(newFormData)
+        twitterUsername: user.twitterUsername || "",
+      };
+      setFormData(newFormData);
     }
-  }, [user])
+  }, [user]);
 
   React.useEffect(() => {
     if (user) {
-      const hasFormChanges = 
-        formData.name !== (user.name || "") ||
+      const hasFormChanges =
+        formData.displayName !== (user.displayName || "") ||
         formData.bio !== (user.bio || "") ||
         formData.location !== (user.location || "") ||
         formData.website !== (user.website || "") ||
         formData.githubUsername !== (user.githubUsername || "") ||
-        formData.twitterUsername !== (user.twitterUsername || "")
-      
-      setHasChanges(hasFormChanges)
+        formData.twitterUsername !== (user.twitterUsername || "");
+
+      setHasChanges(hasFormChanges);
     }
-  }, [formData, user])
+  }, [formData, user]);
 
   const validateForm = (): boolean => {
-    const errors: Partial<UserProfileData> = {}
-    
-    if (!formData.name.trim()) {
-      errors.name = "Name is required"
-    } else if (formData.name.trim().length < 2) {
-      errors.name = "Name must be at least 2 characters"
+    const errors: Partial<UserProfileData> = {};
+
+    if (!formData.displayName.trim()) {
+      errors.displayName = "Name is required";
+    } else if (formData.displayName.trim().length < 2) {
+      errors.displayName = "Name must be at least 2 characters";
     }
-    
+
     if (formData.website && !isValidUrl(formData.website)) {
-      errors.website = "Please enter a valid URL"
+      errors.website = "Please enter a valid URL";
     }
-    
-    if (formData.githubUsername && !/^[a-zA-Z0-9]([a-zA-Z0-9-])*[a-zA-Z0-9]$/.test(formData.githubUsername)) {
-      errors.githubUsername = "Please enter a valid GitHub username"
+
+    if (
+      formData.githubUsername &&
+      !/^[a-zA-Z0-9]([a-zA-Z0-9-])*[a-zA-Z0-9]$/.test(formData.githubUsername)
+    ) {
+      errors.githubUsername = "Please enter a valid GitHub username";
     }
-    
-    if (formData.twitterUsername && !/^[a-zA-Z0-9_]+$/.test(formData.twitterUsername)) {
-      errors.twitterUsername = "Please enter a valid Twitter username"
+
+    if (
+      formData.twitterUsername &&
+      !/^[a-zA-Z0-9_]+$/.test(formData.twitterUsername)
+    ) {
+      errors.twitterUsername = "Please enter a valid Twitter username";
     }
-    
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const isValidUrl = (string: string): boolean => {
     try {
-      new URL(string)
-      return true
+      new URL(string);
+      return true;
     } catch (_) {
-      return false
+      return false;
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm() || !onSubmit) return
-    
+    e.preventDefault();
+
+    if (!validateForm() || !onSubmit) return;
+
     try {
-      await onSubmit(formData)
-      setHasChanges(false)
+      await onSubmit(formData);
+      setHasChanges(false);
     } catch (err) {
       // Error handling is managed by parent component
     }
-  }
+  };
 
   const handleInputChange = (field: keyof UserProfileData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
-  }
+  };
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !onAvatarUpload) return
+    const file = e.target.files?.[0];
+    if (!file || !onAvatarUpload) return;
 
     // Validate file type and size
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file')
-      return
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
     }
-    
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      alert('Image size must be less than 5MB')
-      return
+
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB limit
+      alert("Image size must be less than 5MB");
+      return;
     }
 
     try {
-      setAvatarUploading(true)
-      await onAvatarUpload(file)
+      setAvatarUploading(true);
+      await onAvatarUpload(file);
     } catch (err) {
-      console.error('Avatar upload failed:', err)
+      console.error("Avatar upload failed:", err);
     } finally {
-      setAvatarUploading(false)
+      setAvatarUploading(false);
     }
-  }
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -191,21 +207,21 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
             Update your profile information and manage your public presence
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Avatar Section */}
           <div className="flex items-center space-x-4">
             <div className="relative">
               <div className="h-20 w-20 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                {user?.avatar ? (
+                {user?.avatarUrl ? (
                   <img
-                    src={user.avatar}
-                    alt={user.name}
+                    src={user.avatarUrl}
+                    alt={user.displayName}
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   <span className="text-2xl font-semibold text-muted-foreground">
-                    {user?.name?.charAt(0)?.toUpperCase() || "?"}
+                    {user?.displayName?.charAt(0)?.toUpperCase() || "?"}
                   </span>
                 )}
               </div>
@@ -225,10 +241,11 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               </Button>
             </div>
             <div>
-              <h3 className="font-medium">{user?.name}</h3>
+              <h3 className="font-medium">{user?.displayName}</h3>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
               <p className="text-xs text-muted-foreground">
-                Member since {user?.createdAt ? formatDate(user.createdAt) : "Unknown"}
+                Member since{" "}
+                {user?.createdAt ? formatDate(user.createdAt) : "Unknown"}
               </p>
             </div>
             <input
@@ -259,18 +276,24 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium">
-                  Full Name *
+                  Display Name *
                 </label>
                 <Input
                   id="name"
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  value={formData.displayName}
+                  onChange={(e) =>
+                    handleInputChange("displayName", e.target.value)
+                  }
                   disabled={isLoading}
-                  className={fieldErrors.name ? "border-destructive" : ""}
+                  className={
+                    fieldErrors.displayName ? "border-destructive" : ""
+                  }
                 />
-                {fieldErrors.name && (
-                  <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                {fieldErrors.displayName && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.displayName}
+                  </p>
                 )}
               </div>
 
@@ -283,7 +306,9 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   type="text"
                   placeholder="e.g. San Francisco, CA"
                   value={formData.location}
-                  onChange={(e) => handleInputChange("location", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("location", e.target.value)
+                  }
                   disabled={isLoading}
                 />
               </div>
@@ -320,7 +345,9 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                 className={fieldErrors.website ? "border-destructive" : ""}
               />
               {fieldErrors.website && (
-                <p className="text-sm text-destructive">{fieldErrors.website}</p>
+                <p className="text-sm text-destructive">
+                  {fieldErrors.website}
+                </p>
               )}
             </div>
 
@@ -334,17 +361,26 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   type="text"
                   placeholder="username"
                   value={formData.githubUsername}
-                  onChange={(e) => handleInputChange("githubUsername", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("githubUsername", e.target.value)
+                  }
                   disabled={isLoading}
-                  className={fieldErrors.githubUsername ? "border-destructive" : ""}
+                  className={
+                    fieldErrors.githubUsername ? "border-destructive" : ""
+                  }
                 />
                 {fieldErrors.githubUsername && (
-                  <p className="text-sm text-destructive">{fieldErrors.githubUsername}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.githubUsername}
+                  </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="twitterUsername" className="text-sm font-medium">
+                <label
+                  htmlFor="twitterUsername"
+                  className="text-sm font-medium"
+                >
                   Twitter Username
                 </label>
                 <Input
@@ -352,12 +388,18 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   type="text"
                   placeholder="username"
                   value={formData.twitterUsername}
-                  onChange={(e) => handleInputChange("twitterUsername", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("twitterUsername", e.target.value)
+                  }
                   disabled={isLoading}
-                  className={fieldErrors.twitterUsername ? "border-destructive" : ""}
+                  className={
+                    fieldErrors.twitterUsername ? "border-destructive" : ""
+                  }
                 />
                 {fieldErrors.twitterUsername && (
-                  <p className="text-sm text-destructive">{fieldErrors.twitterUsername}</p>
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.twitterUsername}
+                  </p>
                 )}
               </div>
             </div>
@@ -369,14 +411,14 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                 onClick={() => {
                   if (user) {
                     setFormData({
-                      name: user.name || "",
+                      displayName: user.displayName || "",
                       bio: user.bio || "",
                       location: user.location || "",
                       website: user.website || "",
                       githubUsername: user.githubUsername || "",
-                      twitterUsername: user.twitterUsername || ""
-                    })
-                    setHasChanges(false)
+                      twitterUsername: user.twitterUsername || "",
+                    });
+                    setHasChanges(false);
                   }
                 }}
                 disabled={isLoading || !hasChanges}
@@ -402,5 +444,5 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};

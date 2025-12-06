@@ -1,42 +1,31 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
-import { Bug, Menu, Search, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import * as React from "react";
+import Link from "next/link";
+import { Bug, Menu, Search, User, User2Icon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/lib/stores";
 
-interface HeaderProps {
-  isAuthenticated?: boolean
-  user?: {
-    name: string
-    email: string
-    avatar?: string
-  }
-  onSearch?: (query: string) => void
-}
+export const Header = () => {
+  const { user, isAuthenticated } = useAuthStore();
+  const [searchQuery, setSearchQuery] = React.useState("");
 
-export const Header: React.FC<HeaderProps> = ({ 
-  isAuthenticated = false, 
-  user,
-  onSearch 
-}) => {
-  const [searchQuery, setSearchQuery] = React.useState("")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
+  const { logout } = useAuthStore();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  console.log(user);
 
   const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (onSearch && searchQuery.trim()) {
-      onSearch(searchQuery.trim())
-    }
-  }
+    e.preventDefault();
+    console.log(searchQuery.trim());
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,23 +36,23 @@ export const Header: React.FC<HeaderProps> = ({
             <Bug className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl">BugRelay</span>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-            <Link 
-              href="/bugs" 
+            <Link
+              href="/bugs"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               Browse Bugs
             </Link>
-            <Link 
-              href="/submit" 
+            <Link
+              href="/submit"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               Submit Bug
             </Link>
-            <Link 
-              href="/companies" 
+            <Link
+              href="/companies"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
               Companies
@@ -89,23 +78,29 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center space-x-4">
           {isAuthenticated && user ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  {user.avatar ? (
+              <DropdownMenuTrigger>
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
+                  {user.avatarUrl ? (
                     <img
-                      src={user.avatar}
-                      alt={user.name}
+                      src={user.avatarUrl}
+                      alt={user.displayName}
                       className="h-8 w-8 rounded-full"
                     />
                   ) : (
-                    <User className="h-4 w-4" />
+                    <div className="flex gap-2">
+                      <User className="h-4 w-4" />
+                      {user.displayName}
+                    </div>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-56" align="end">
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">{user.name}</p>
+                    <p className="font-medium">{user.displayName}</p>
                     <p className="w-[200px] truncate text-sm text-muted-foreground">
                       {user.email}
                     </p>
@@ -122,9 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Link href="/settings">Settings</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  Sign out
-                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={logout}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -137,7 +130,6 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
             </div>
           )}
-
           {/* Mobile Menu Button */}
           <Button
             variant="ghost"
@@ -154,22 +146,22 @@ export const Header: React.FC<HeaderProps> = ({
       {isMobileMenuOpen && (
         <div className="md:hidden border-t bg-background">
           <nav className="container py-4 space-y-2">
-            <Link 
-              href="/bugs" 
+            <Link
+              href="/bugs"
               className="block px-2 py-1 text-sm font-medium transition-colors hover:text-foreground/80 text-foreground/60"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Browse Bugs
             </Link>
-            <Link 
-              href="/submit" 
+            <Link
+              href="/submit"
               className="block px-2 py-1 text-sm font-medium transition-colors hover:text-foreground/80 text-foreground/60"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Submit Bug
             </Link>
-            <Link 
-              href="/companies" 
+            <Link
+              href="/companies"
               className="block px-2 py-1 text-sm font-medium transition-colors hover:text-foreground/80 text-foreground/60"
               onClick={() => setIsMobileMenuOpen(false)}
             >
@@ -179,5 +171,5 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
     </header>
-  )
-}
+  );
+};

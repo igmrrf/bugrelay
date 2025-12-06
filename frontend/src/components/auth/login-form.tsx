@@ -1,88 +1,101 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
-import { Eye, EyeOff, Github, Mail } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoadingSpinner } from "@/components/ui/loading"
+import * as React from "react";
+import Link from "next/link";
+import { Eye, EyeOff, Github, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { useLogin } from "@/lib/hooks";
 
 interface LoginFormProps {
-  onSubmit?: (data: LoginFormData) => Promise<void>
-  onOAuthLogin?: (provider: "google" | "github") => void
-  isLoading?: boolean
-  error?: string
+  onSubmit?: (data: LoginFormData) => Promise<void>;
+  onOAuthLogin?: (provider: "google" | "github") => void;
+  isLoading?: boolean;
+  error?: string;
 }
 
 export interface LoginFormData {
-  email: string
-  password: string
-  rememberMe: boolean
+  email: string;
+  password: string;
+  rememberMe: boolean;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({
-  onSubmit,
   onOAuthLogin,
-  isLoading = false,
-  error
+  error,
 }) => {
+  const { mutate: onSubmit, isPending: isLoading } = useLogin();
   const [formData, setFormData] = React.useState<LoginFormData>({
     email: "",
     password: "",
-    rememberMe: false
-  })
-  const [showPassword, setShowPassword] = React.useState(false)
-  const [fieldErrors, setFieldErrors] = React.useState<Partial<LoginFormData>>({})
+    rememberMe: false,
+  });
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<Partial<LoginFormData>>(
+    {},
+  );
 
   const validateForm = (): boolean => {
-    const errors: Partial<LoginFormData> = {}
-    
+    const errors: Partial<LoginFormData> = {};
+
     if (!formData.email) {
-      errors.email = "Email is required"
+      errors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = "Please enter a valid email address"
+      errors.email = "Please enter a valid email address";
     }
-    
+
     if (!formData.password) {
-      errors.password = "Password is required"
+      errors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      errors.password = "Password must be at least 6 characters"
+      errors.password = "Password must be at least 6 characters";
     }
-    
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm() || !onSubmit) return
-    
+    e.preventDefault();
+
+    if (!validateForm() || !onSubmit) return;
+
     try {
-      await onSubmit(formData)
+      onSubmit(formData);
     } catch (err) {
       // Error handling is managed by parent component
     }
-  }
+  };
 
-  const handleInputChange = (field: keyof LoginFormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const handleInputChange = (
+    field: keyof LoginFormData,
+    value: string | boolean,
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
+        <CardTitle className="text-2xl font-bold text-center">
+          Sign in
+        </CardTitle>
         <CardDescription className="text-center">
           Enter your email and password to access your account
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {/* OAuth Buttons */}
         <div className="grid grid-cols-2 gap-4">
@@ -156,7 +169,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 value={formData.password}
                 onChange={(e) => handleInputChange("password", e.target.value)}
                 disabled={isLoading}
-                className={fieldErrors.password ? "border-destructive pr-10" : "pr-10"}
+                className={
+                  fieldErrors.password ? "border-destructive pr-10" : "pr-10"
+                }
               />
               <Button
                 type="button"
@@ -184,7 +199,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 id="remember"
                 type="checkbox"
                 checked={formData.rememberMe}
-                onChange={(e) => handleInputChange("rememberMe", e.target.checked)}
+                onChange={(e) =>
+                  handleInputChange("rememberMe", e.target.checked)
+                }
                 disabled={isLoading}
                 className="h-4 w-4 rounded border-gray-300"
               />
@@ -220,5 +237,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
+

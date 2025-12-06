@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <MainLayout>
       {/* Hero Section */}
-      <section className="py-20 px-4 text-center bg-gradient-to-b from-background to-muted/20">
+      <section className="py-20 px-4 text-center bg-linear-to-b from-background to-muted/20">
         <div className="container max-w-4xl mx-auto">
           <div className="flex justify-center mb-6">
             <Bug className="h-16 w-16 text-primary" />

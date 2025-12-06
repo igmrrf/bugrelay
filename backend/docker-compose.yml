@@ -1,0 +1,112 @@
+services:
+  # PostgreSQL Database - Base service for both dev and prod
+  postgres:
+    image: postgres:17.0-alpine
+    container_name: bugrelay-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bugrelay}
+      POSTGRES_USER: ${DB_USER:-bugrelay_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bugrelay_password}
+    ports:
+      # Only expose port in development
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - bugrelay
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bugrelay_user} -d ${DB_NAME:-bugrelay}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache - Base service for both dev and prod
+  redis:
+    image: redis:7.4.1-alpine
+    container_name: bugrelay-redis
+    command: >
+      sh -c "
+        if [ '${ENVIRONMENT:-development}' = 'production' ]; then
+          redis-server --requirepass "${REDIS_PASSWORD}"
+        else
+          redis-server
+        fi
+      "
+    ports:
+      # Only expose port in development
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bugrelay
+    restart: unless-stopped
+    healthcheck:
+      test: >
+        sh -c "
+          if [ '${ENVIRONMENT:-development}' = 'production' ]; then
+            redis-cli --no-auth-warning -a ${REDIS_PASSWORD} ping
+          else
+            redis-cli ping
+          fi
+        "
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # -----------------------------
+  # Go Application
+  # -----------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: bugrelay-backend-dev
+    ports:
+      - "8080:8080"
+      - "2345:2345" # Delve debugger port
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-bugrelay}
+      - DB_USER=${DB_USER:-bugrelay_user}
+      - DB_PASSWORD=${DB_PASSWORD:-bugrelay_password}
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-key}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=json
+      - LOG_OUTPUT=both
+    volumes:
+      - ./:/app
+      - backend_logs:/app/logs
+    networks:
+      - bugrelay
+      - monitoring
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+  loki_data:
+  prometheus_data:
+  alertmanager_data:
+  backend_logs:
+  frontend_logs:
+  nginx_logs:
+
+networks:
+  bugrelay:
+    driver: bridge
+  monitoring:
+    driver: bridge

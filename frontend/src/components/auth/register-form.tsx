@@ -1,34 +1,41 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
-import { Eye, EyeOff, Github, Mail, Check, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LoadingSpinner } from "@/components/ui/loading"
+import * as React from "react";
+import Link from "next/link";
+import { Eye, EyeOff, Github, Mail, Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { useRegister } from "@/lib/hooks";
 
 interface RegisterFormProps {
-  onSubmit?: (data: RegisterFormData) => Promise<void>
-  onOAuthLogin?: (provider: "google" | "github") => void
-  isLoading?: boolean
-  error?: string
+  onSubmit: (data: RegisterFormData) => Promise<void>;
+  onOAuthLogin?: (provider: "google" | "github") => void;
+  isLoading?: boolean;
+  error?: string;
 }
 
 export interface RegisterFormData {
-  name: string
-  email: string
-  password: string
-  confirmPassword: string
-  acceptTerms: boolean
+  display_name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
 }
 
 interface RegisterFormErrors {
-  name?: string
-  email?: string
-  password?: string
-  confirmPassword?: string
-  acceptTerms?: string
+  display_name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  acceptTerms?: string;
 }
 
 const passwordRequirements = [
@@ -36,92 +43,100 @@ const passwordRequirements = [
   { regex: /[A-Z]/, text: "One uppercase letter" },
   { regex: /[a-z]/, text: "One lowercase letter" },
   { regex: /\d/, text: "One number" },
-  { regex: /[^A-Za-z0-9]/, text: "One special character" }
-]
+  { regex: /[^A-Za-z0-9]/, text: "One special character" },
+];
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({
-  onSubmit,
   onOAuthLogin,
-  isLoading = false,
-  error
+  error,
 }) => {
+  const { mutate: onSubmit, isPending: isLoading } = useRegister();
   const [formData, setFormData] = React.useState<RegisterFormData>({
-    name: "",
+    display_name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    acceptTerms: false
-  })
-  const [showPassword, setShowPassword] = React.useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
-  const [fieldErrors, setFieldErrors] = React.useState<RegisterFormErrors>({})
-  const [showPasswordRequirements, setShowPasswordRequirements] = React.useState(false)
+    acceptTerms: false,
+  });
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<RegisterFormErrors>({});
+  const [showPasswordRequirements, setShowPasswordRequirements] =
+    React.useState(false);
 
   const validateForm = (): boolean => {
-    const errors: RegisterFormErrors = {}
+    const errors: RegisterFormErrors = {};
 
-    if (!formData.name.trim()) {
-      errors.name = "Name is required"
-    } else if (formData.name.trim().length < 2) {
-      errors.name = "Name must be at least 2 characters"
+    if (!formData.display_name.trim()) {
+      errors.display_name = "Display name is required";
+    } else if (formData.display_name.trim().length < 2) {
+      errors.display_name = "Display name must be at least 2 characters";
     }
 
     if (!formData.email) {
-      errors.email = "Email is required"
+      errors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = "Please enter a valid email address"
+      errors.email = "Please enter a valid email address";
     }
 
     if (!formData.password) {
-      errors.password = "Password is required"
-    } else if (!passwordRequirements.every(req => req.regex.test(formData.password))) {
-      errors.password = "Password does not meet requirements"
+      errors.password = "Password is required";
+    } else if (
+      !passwordRequirements.every((req) => req.regex.test(formData.password))
+    ) {
+      errors.password = "Password does not meet requirements";
     }
 
     if (!formData.confirmPassword) {
-      errors.confirmPassword = "Please confirm your password"
+      errors.confirmPassword = "Please confirm your password";
     } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match"
+      errors.confirmPassword = "Passwords do not match";
     }
 
     if (!formData.acceptTerms) {
-      errors.acceptTerms = "You must accept the terms and conditions"
+      errors.acceptTerms = "You must accept the terms and conditions";
     }
 
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateForm() || !onSubmit) return
+    if (!validateForm() || !onSubmit) return;
 
     try {
-      await onSubmit(formData)
+      await onSubmit(formData);
     } catch (err) {
       // Error handling is managed by parent component
     }
-  }
+  };
 
-  const handleInputChange = (field: keyof RegisterFormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const handleInputChange = (
+    field: keyof RegisterFormData,
+    value: string | boolean,
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
-  }
+  };
 
   const getPasswordStrength = (password: string): number => {
-    return passwordRequirements.filter(req => req.regex.test(password)).length
-  }
+    return passwordRequirements.filter((req) => req.regex.test(password))
+      .length;
+  };
 
-  const passwordStrength = getPasswordStrength(formData.password)
+  const passwordStrength = getPasswordStrength(formData.password);
 
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Create account</CardTitle>
+        <CardTitle className="text-2xl font-bold text-center">
+          Create account
+        </CardTitle>
         <CardDescription className="text-center">
           Enter your information to create your BugRelay account
         </CardDescription>
@@ -172,19 +187,23 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
-              Full Name
+              Display Name
             </label>
             <Input
               id="name"
               type="text"
-              placeholder="Enter your full name"
-              value={formData.name}
-              onChange={(e) => handleInputChange("name", e.target.value)}
+              placeholder="Enter your Display name"
+              value={formData.display_name}
+              onChange={(e) =>
+                handleInputChange("display_name", e.target.value)
+              }
               disabled={isLoading}
-              className={fieldErrors.name ? "border-destructive" : ""}
+              className={fieldErrors.display_name ? "border-destructive" : ""}
             />
-            {fieldErrors.name && (
-              <p className="text-sm text-destructive">{fieldErrors.name}</p>
+            {fieldErrors.display_name && (
+              <p className="text-sm text-destructive">
+                {fieldErrors.display_name}
+              </p>
             )}
           </div>
 
@@ -220,7 +239,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
                 onFocus={() => setShowPasswordRequirements(true)}
                 onBlur={() => setShowPasswordRequirements(false)}
                 disabled={isLoading}
-                className={fieldErrors.password ? "border-destructive pr-10" : "pr-10"}
+                className={
+                  fieldErrors.password ? "border-destructive pr-10" : "pr-10"
+                }
               />
               <Button
                 type="button"
@@ -245,23 +266,27 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
                   {[1, 2, 3, 4, 5].map((level) => (
                     <div
                       key={level}
-                      className={`h-1 flex-1 rounded ${passwordStrength >= level
+                      className={`h-1 flex-1 rounded ${
+                        passwordStrength >= level
                           ? passwordStrength <= 2
                             ? "bg-red-500"
                             : passwordStrength <= 3
                               ? "bg-yellow-500"
                               : "bg-green-500"
                           : "bg-gray-200"
-                        }`}
+                      }`}
                     />
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Password strength: {
-                    passwordStrength <= 2 ? "Weak" :
-                      passwordStrength <= 3 ? "Fair" :
-                        passwordStrength <= 4 ? "Good" : "Strong"
-                  }
+                  Password strength:{" "}
+                  {passwordStrength <= 2
+                    ? "Weak"
+                    : passwordStrength <= 3
+                      ? "Fair"
+                      : passwordStrength <= 4
+                        ? "Good"
+                        : "Strong"}
                 </p>
               </div>
             )}
@@ -270,19 +295,24 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             {(showPasswordRequirements || fieldErrors.password) && (
               <div className="space-y-1">
                 {passwordRequirements.map((req, index) => {
-                  const isValid = req.regex.test(formData.password)
+                  const isValid = req.regex.test(formData.password);
                   return (
-                    <div key={index} className="flex items-center space-x-2 text-xs">
+                    <div
+                      key={index}
+                      className="flex items-center space-x-2 text-xs"
+                    >
                       {isValid ? (
                         <Check className="h-3 w-3 text-green-500" />
                       ) : (
                         <X className="h-3 w-3 text-gray-400" />
                       )}
-                      <span className={isValid ? "text-green-600" : "text-gray-500"}>
+                      <span
+                        className={isValid ? "text-green-600" : "text-gray-500"}
+                      >
                         {req.text}
                       </span>
                     </div>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -302,9 +332,15 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
-                onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("confirmPassword", e.target.value)
+                }
                 disabled={isLoading}
-                className={fieldErrors.confirmPassword ? "border-destructive pr-10" : "pr-10"}
+                className={
+                  fieldErrors.confirmPassword
+                    ? "border-destructive pr-10"
+                    : "pr-10"
+                }
               />
               <Button
                 type="button"
@@ -322,7 +358,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               </Button>
             </div>
             {fieldErrors.confirmPassword && (
-              <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
+              <p className="text-sm text-destructive">
+                {fieldErrors.confirmPassword}
+              </p>
             )}
           </div>
 
@@ -331,7 +369,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               id="terms"
               type="checkbox"
               checked={formData.acceptTerms}
-              onChange={(e) => handleInputChange("acceptTerms", e.target.checked)}
+              onChange={(e) =>
+                handleInputChange("acceptTerms", e.target.checked)
+              }
               disabled={isLoading}
               className="h-4 w-4 rounded border-gray-300 mt-0.5"
             />
@@ -347,7 +387,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
             </label>
           </div>
           {fieldErrors.acceptTerms && (
-            <p className="text-sm text-destructive">{fieldErrors.acceptTerms}</p>
+            <p className="text-sm text-destructive">
+              {fieldErrors.acceptTerms}
+            </p>
           )}
 
           <Button type="submit" className="w-full" disabled={isLoading}>
@@ -370,5 +412,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         </div>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
+

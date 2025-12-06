@@ -1,25 +1,25 @@
 global:
   # SMTP configuration - environment specific
-  smtp_smarthost: '${SMTP_HOST:-mailhog:1025}'
-  smtp_from: '${SMTP_FROM:-alerts@bugrelay.local}'
-  smtp_auth_username: '${SMTP_USERNAME:-}'
-  smtp_auth_password: '${SMTP_PASSWORD:-}'
-  smtp_require_tls: ${SMTP_REQUIRE_TLS:-false}
+  smtp_smarthost: 'mailhog:1025'
+  smtp_from: 'alerts@bugrelay.local'
+  smtp_auth_username: '-'
+  smtp_auth_password: '-'
+  smtp_require_tls: false
 
 route:
   group_by: ['alertname', 'environment', 'severity']
   # Development: faster grouping, Production: slower for batching
-  group_wait: ${ALERT_GROUP_WAIT:-10s}
-  group_interval: ${ALERT_GROUP_INTERVAL:-5m}
-  repeat_interval: ${ALERT_REPEAT_INTERVAL:-1h}
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 1h
   receiver: 'default-receiver'
   routes:
     # Critical alerts - immediate notification
     - match:
         severity: critical
       receiver: 'critical-alerts'
-      group_wait: ${CRITICAL_GROUP_WAIT:-10s}
-      repeat_interval: ${CRITICAL_REPEAT_INTERVAL:-30m}
+      group_wait: 10s
+      repeat_interval: 30m
       routes:
         # Database critical alerts
         - match:
@@ -34,8 +34,8 @@ route:
     - match:
         severity: warning
       receiver: 'warning-alerts'
-      group_wait: ${WARNING_GROUP_WAIT:-2m}
-      repeat_interval: ${WARNING_REPEAT_INTERVAL:-2h}
+      group_wait: 2m
+      repeat_interval: 2h
       routes:
         # Security warnings
         - match:
@@ -51,10 +51,10 @@ receivers:
   # Default receiver for unmatched alerts
   - name: 'default-receiver'
     email_configs:
-      - to: '${DEFAULT_EMAIL_TO:-dev-team@bugrelay.local}'
-        subject: '[${ENVIRONMENT:-dev}] BugRelay Alert: {{ .GroupLabels.alertname }}'
-        body: |
-          Environment: ${ENVIRONMENT:-development}
+      - to: 'dev-team@bugrelay.local'
+        text: |
+          Environment: development
+          [dev] BugRelay Alert: {{ .GroupLabels.alertname }}
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -70,10 +70,10 @@ receivers:
   # Critical alerts - multiple channels
   - name: 'critical-alerts'
     email_configs:
-      - to: '${CRITICAL_EMAIL_TO:-ops-team@bugrelay.local}'
-        subject: '🚨 [${ENVIRONMENT:-dev} CRITICAL] {{ .GroupLabels.alertname }}'
-        body: |
-          🚨 CRITICAL ALERT - ${ENVIRONMENT:-development} 🚨
+      - to: 'ops-team@bugrelay.local'
+        text: |
+          🚨 CRITICAL ALERT - development 🚨 
+          🚨 [dev CRITICAL] {{ .GroupLabels.alertname }}
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -91,13 +91,13 @@ receivers:
           This is a critical alert requiring immediate attention.
         headers:
           X-Priority: 'high'
-          X-Environment: '${ENVIRONMENT:-development}'
+          X-Environment: 'development'
     
     # Slack configuration (if enabled)
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL:-}'
-        channel: '${SLACK_CRITICAL_CHANNEL:-#alerts-critical}'
-        title: '🚨 [${ENVIRONMENT:-dev}] Critical: {{ .GroupLabels.alertname }}'
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#alerts-critical'
+        title: '🚨 [dev] Critical: {{ .GroupLabels.alertname }}'
         text: |
           {{ range .Alerts }}
           *{{ .Annotations.summary }}*
@@ -105,24 +105,25 @@ receivers:
           
           *Service:* {{ .Labels.service }}
           *Severity:* {{ .Labels.severity }}
-          *Environment:* ${ENVIRONMENT:-development}
+          *Environment:* development
           {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
           {{ end }}
         send_resolved: true
 
     # PagerDuty integration (production only)
     pagerduty_configs:
-      - routing_key: '${PAGERDUTY_INTEGRATION_KEY:-}'
-        description: '[${ENVIRONMENT:-dev}] {{ .GroupLabels.alertname }}: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+      - routing_key: '-'
+        description: '[dev] {{ .GroupLabels.alertname }}: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
         severity: 'critical'
 
   # Database critical alerts
   - name: 'database-critical'
     email_configs:
-      - to: '${DATABASE_EMAIL_TO:-dba-team@bugrelay.local}'
-        subject: '🗄️ [${ENVIRONMENT:-dev} DATABASE CRITICAL] {{ .GroupLabels.alertname }}'
-        body: |
-          🗄️ DATABASE CRITICAL ALERT - ${ENVIRONMENT:-development} 🗄️
+      - to: 'dba-team@bugrelay.local'
+        text: |
+          🗄️ DATABASE CRITICAL ALERT - development 🗄️
+          🗄️ [dev DATABASE CRITICAL] {{ .GroupLabels.alertname }}
+
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -139,26 +140,26 @@ receivers:
           Immediate database attention required!
 
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL:-}'
-        channel: '${SLACK_DATABASE_CHANNEL:-#database-alerts}'
-        title: '🗄️ [${ENVIRONMENT:-dev}] Database Critical: {{ .GroupLabels.alertname }}'
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#database-alerts'
+        title: '🗄️ [dev] Database Critical: {{ .GroupLabels.alertname }}'
         text: |
           {{ range .Alerts }}
           *{{ .Annotations.summary }}*
           {{ .Annotations.description }}
           
           *Instance:* {{ .Labels.instance }}
-          *Environment:* ${ENVIRONMENT:-development}
+          *Environment:* development
           {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
           {{ end }}
 
   # Security critical alerts
   - name: 'security-critical'
     email_configs:
-      - to: '${SECURITY_EMAIL_TO:-security-team@bugrelay.local}'
-        subject: '🔒 [${ENVIRONMENT:-dev} SECURITY CRITICAL] {{ .GroupLabels.alertname }}'
-        body: |
-          🔒 SECURITY CRITICAL ALERT - ${ENVIRONMENT:-development} 🔒
+      - to: 'security-team@bugrelay.local'
+        text: |
+          🔒 SECURITY CRITICAL ALERT - development 🔒
+          🔒 [dev SECURITY CRITICAL] {{ .GroupLabels.alertname }}
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -171,25 +172,25 @@ receivers:
           Immediate security investigation required!
 
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL:-}'
-        channel: '${SLACK_SECURITY_CHANNEL:-#security-alerts}'
-        title: '🔒 [${ENVIRONMENT:-dev}] Security Critical: {{ .GroupLabels.alertname }}'
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#security-alerts'
+        title: '🔒 [dev] Security Critical: {{ .GroupLabels.alertname }}'
         text: |
           {{ range .Alerts }}
           *{{ .Annotations.summary }}*
           {{ .Annotations.description }}
           
           *Instance:* {{ .Labels.instance }}
-          *Environment:* ${ENVIRONMENT:-development}
+          *Environment:* development
           {{ end }}
 
   # Warning alerts
   - name: 'warning-alerts'
     email_configs:
-      - to: '${WARNING_EMAIL_TO:-ops-team@bugrelay.local}'
-        subject: '⚠️ [${ENVIRONMENT:-dev} WARNING] {{ .GroupLabels.alertname }}'
-        body: |
-          ⚠️ WARNING ALERT - ${ENVIRONMENT:-development} ⚠️
+      - to: 'ops-team@bugrelay.local'
+        text: |
+          ⚠️ WARNING ALERT - development ⚠️ 
+          ⚠️ [dev WARNING] {{ .GroupLabels.alertname }}
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -205,26 +206,27 @@ receivers:
           {{ end }}
 
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL:-}'
-        channel: '${SLACK_WARNING_CHANNEL:-#alerts-warning}'
-        title: '⚠️ [${ENVIRONMENT:-dev}] Warning: {{ .GroupLabels.alertname }}'
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#alerts-warning'
+        title: '⚠️ [dev] Warning: {{ .GroupLabels.alertname }}'
         text: |
           {{ range .Alerts }}
           *{{ .Annotations.summary }}*
           {{ .Annotations.description }}
           
           *Service:* {{ .Labels.service }}
-          *Environment:* ${ENVIRONMENT:-development}
+          *Environment:* development
           {{ end }}
         send_resolved: true
 
   # Security warnings
   - name: 'security-warnings'
     email_configs:
-      - to: '${SECURITY_EMAIL_TO:-security-team@bugrelay.local}'
-        subject: '🔍 [${ENVIRONMENT:-dev} SECURITY WARNING] {{ .GroupLabels.alertname }}'
-        body: |
-          🔍 SECURITY WARNING - ${ENVIRONMENT:-development} 🔍
+      - to: 'security-team@bugrelay.local'
+        text: |
+          🔍 SECURITY WARNING - development 🔍 
+          🔍 [dev SECURITY WARNING] {{ .GroupLabels.alertname }}
+
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
@@ -234,23 +236,23 @@ receivers:
           {{ end }}
 
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL:-}'
-        channel: '${SLACK_SECURITY_CHANNEL:-#security-alerts}'
-        title: '🔍 [${ENVIRONMENT:-dev}] Security Warning: {{ .GroupLabels.alertname }}'
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#security-alerts'
+        title: '🔍 [dev] Security Warning: {{ .GroupLabels.alertname }}'
         text: |
           {{ range .Alerts }}
           *{{ .Annotations.summary }}*
           {{ .Annotations.description }}
-          *Environment:* ${ENVIRONMENT:-development}
+          *Environment:* development
           {{ end }}
 
   # Monitoring system alerts
   - name: 'monitoring-alerts'
     email_configs:
-      - to: '${MONITORING_EMAIL_TO:-ops-team@bugrelay.local}'
-        subject: '📊 [${ENVIRONMENT:-dev} MONITORING] {{ .GroupLabels.alertname }}'
-        body: |
-          📊 MONITORING SYSTEM ALERT - ${ENVIRONMENT:-development} 📊
+      - to: 'ops-team@bugrelay.local'
+        text: |
+          📊 MONITORING SYSTEM ALERT - development 📊
+          📊 [dev MONITORING] {{ .GroupLabels.alertname }}
           
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}

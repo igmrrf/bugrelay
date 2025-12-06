@@ -1,10 +1,10 @@
 global:
   # Development: 15s, Production: 30s
-  scrape_interval: ${PROMETHEUS_SCRAPE_INTERVAL:-15s}
-  evaluation_interval: ${PROMETHEUS_EVALUATION_INTERVAL:-15s}
+  scrape_interval: 15s
+  evaluation_interval: 15s
   external_labels:
-    environment: '${ENVIRONMENT:-development}'
-    cluster: '${PROMETHEUS_CLUSTER:-bugrelay}'
+    environment: 'development'
+    cluster: 'bugrelay'
 
 rule_files:
   - "alert_rules.yml"
@@ -20,7 +20,7 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-    scrape_interval: ${PROMETHEUS_SELF_SCRAPE_INTERVAL:-60s}
+    scrape_interval: 60s
 
   # Node Exporter for system metrics
   - job_name: 'node-exporter'
@@ -37,48 +37,48 @@ scrape_configs:
   # BugRelay Backend Application Metrics
   - job_name: 'bugrelay-backend'
     static_configs:
-      - targets: ['${BACKEND_TARGET:-backend:8080}']
+      - targets: ['backend:8080']
     metrics_path: '/metrics'
-    scrape_interval: ${BACKEND_SCRAPE_INTERVAL:-15s}
+    scrape_interval: 15s
     scrape_timeout: 10s
 
   # BugRelay Frontend Application Metrics
   - job_name: 'bugrelay-frontend'
     static_configs:
-      - targets: ['${FRONTEND_TARGET:-frontend:3000}']
+      - targets: ['frontend:3000']
     metrics_path: '/api/metrics'
-    scrape_interval: ${FRONTEND_SCRAPE_INTERVAL:-30s}
+    scrape_interval: 30s
     scrape_timeout: 10s
 
   # Nginx Metrics (Production only)
   - job_name: 'nginx'
     static_configs:
-      - targets: ['${NGINX_TARGET:-nginx:9113}']
+      - targets: ['nginx:9113']
     scrape_interval: 30s
 
   # PostgreSQL Database Metrics
   - job_name: 'postgres'
     static_configs:
-      - targets: ['${POSTGRES_TARGET:-postgres-exporter:9187}']
+      - targets: ['postgres-exporter:9187']
     scrape_interval: 30s
 
   # Redis Metrics
   - job_name: 'redis'
     static_configs:
-      - targets: ['${REDIS_TARGET:-redis-exporter:9121}']
+      - targets: ['redis-exporter:9121']
     scrape_interval: 30s
 
   # Loki Metrics
   - job_name: 'loki'
     static_configs:
       - targets: ['loki:3100']
-    scrape_interval: ${LOKI_SCRAPE_INTERVAL:-30s}
+    scrape_interval: 30s
 
   # Grafana Metrics
   - job_name: 'grafana'
     static_configs:
       - targets: ['grafana:3000']
-    scrape_interval: ${GRAFANA_SCRAPE_INTERVAL:-60s}
+    scrape_interval: 60s
 
   # AlertManager Metrics
   - job_name: 'alertmanager'

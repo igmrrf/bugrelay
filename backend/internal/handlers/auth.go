@@ -75,10 +75,10 @@ type AuthResponse struct {
 type UserResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Email       string    `json:"email"`
-	DisplayName string    `json:"display_name"`
-	AvatarURL   *string   `json:"avatar_url,omitempty"`
-	IsAdmin     bool      `json:"is_admin"`
-	CreatedAt   time.Time `json:"created_at"`
+	DisplayName string    `json:"displayName"`
+	AvatarURL   *string   `json:"avatarUrl,omitempty"`
+	IsAdmin     bool      `json:"isAdmin"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // Register handles user registration
@@ -102,6 +102,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			"error": gin.H{
 				"code":      "WEAK_PASSWORD",
 				"message":   err.Error(),
+				"details":   err.Error(),
 				"timestamp": time.Now(),
 			},
 		})
@@ -182,7 +183,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":      "TOKEN_GENERATION_FAILED",
-				"message":   "Failed to generate authentication tokens",
 				"timestamp": time.Now(),
 			},
 		})
@@ -204,8 +204,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully",
-		"data":    response,
+		"code": "USER_CREATION_PASSED",
+		"data": response,
 	})
 }
 
@@ -305,6 +305,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"code":    "LOGIN_SUCCESS",
 		"message": "Login successful",
 		"data":    response,
 	})

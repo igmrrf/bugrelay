@@ -219,8 +219,8 @@ common:
 
 schema_config:
   configs:
-    - from: 2020-10-24
-      store: boltdb-shipper
+    - from: 2020-10-25
+      store: tsdb
       object_store: filesystem
       schema: v11
       index:

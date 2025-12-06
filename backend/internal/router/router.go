@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -272,4 +271,3 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 
 	return r
 }
-
