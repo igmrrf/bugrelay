@@ -6,8 +6,8 @@ const mockComments: Comment[] = [
   {
     id: '1',
     content: 'This is a test comment',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
     isCompanyResponse: false,
     user: {
       id: 'user1',
@@ -19,8 +19,8 @@ const mockComments: Comment[] = [
   {
     id: '2',
     content: 'This is a company response',
-    createdAt: '2024-01-02T00:00:00Z',
-    updatedAt: '2024-01-02T00:00:00Z',
+    createdAt: '2025-01-02T00:00:00Z',
+    updatedAt: '2025-01-02T00:00:00Z',
     isCompanyResponse: true,
     user: {
       id: 'company1',
@@ -336,7 +336,7 @@ describe('CommentSection', () => {
   it('shows edited indicator when comment is edited', () => {
     const editedComment = {
       ...mockComments[0],
-      updatedAt: '2024-01-01T01:00:00Z' // Different from createdAt
+      updatedAt: '2025-01-01T01:00:00Z' // Different from createdAt
     }
     
     render(<CommentSection comments={[editedComment]} bugId="bug1" />)

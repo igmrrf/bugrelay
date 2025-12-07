@@ -66,7 +66,7 @@ describe('Input', () => {
     expect(handleChange).toHaveBeenCalledTimes(4) // One for each character
   })
 
-  it('handles focus and blur events', async () => {
+  it('handles focus and blur-sm events', async () => {
     const handleFocus = jest.fn()
     const handleBlur = jest.fn()
     const user = userEvent.setup()

@@ -126,8 +126,8 @@ export const useRefreshToken = () => {
       loadingManager.start("auth.refresh");
     },
     onSuccess: (data) => {
-      setUser(data.user);
-      queryClient.setQueryData(queryKeys.auth.profile(), data.user);
+      setUser(data.data.user);
+      queryClient.setQueryData(queryKeys.auth.profile(), data.data.user);
     },
     onError: (error) => {
       // If refresh fails, user needs to log in again

@@ -8,7 +8,7 @@ describe('Card Components', () => {
       
       const card = screen.getByText('Card content')
       expect(card).toBeInTheDocument()
-      expect(card).toHaveClass('rounded-lg', 'border', 'bg-card', 'shadow-sm')
+      expect(card).toHaveClass('rounded-lg', 'border', 'bg-card', 'shadow-xs')
     })
 
     it('applies custom className', () => {

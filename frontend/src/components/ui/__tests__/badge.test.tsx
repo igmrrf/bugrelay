@@ -87,7 +87,7 @@ describe('Badge', () => {
     render(<Badge>Focusable Badge</Badge>)
     
     const badge = screen.getByText('Focusable Badge')
-    expect(badge).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-ring', 'focus:ring-offset-2')
+    expect(badge).toHaveClass('focus:outline-hidden', 'focus:ring-2', 'focus:ring-ring', 'focus:ring-offset-2')
   })
 
   it('has hover effects for interactive variants', () => {

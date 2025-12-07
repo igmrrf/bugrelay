@@ -46,11 +46,8 @@ const passwordRequirements = [
   { regex: /[^A-Za-z0-9]/, text: "One special character" },
 ];
 
-export const RegisterForm: React.FC<RegisterFormProps> = ({
-  onOAuthLogin,
-  error,
-}) => {
-  const { mutate: onSubmit, isPending: isLoading } = useRegister();
+export const RegisterForm = () => {
+  const { mutate: onSubmit, isPending: isLoading, error } = useRegister();
   const [formData, setFormData] = React.useState<RegisterFormData>({
     display_name: "",
     email: "",
@@ -63,6 +60,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   const [fieldErrors, setFieldErrors] = React.useState<RegisterFormErrors>({});
   const [showPasswordRequirements, setShowPasswordRequirements] =
     React.useState(false);
+
+  const onOAuthLogin = (oauth: "google" | "github") => {};
 
   const validateForm = (): boolean => {
     const errors: RegisterFormErrors = {};
@@ -147,7 +146,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <Button
             variant="outline"
-            onClick={() => onOAuthLogin?.("google")}
+            onClick={() => onOAuthLogin("google")}
             disabled={isLoading}
             className="w-full"
           >
@@ -156,7 +155,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           </Button>
           <Button
             variant="outline"
-            onClick={() => onOAuthLogin?.("github")}
+            onClick={() => onOAuthLogin("github")}
             disabled={isLoading}
             className="w-full"
           >
@@ -179,7 +178,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         {/* Error Message */}
         {error && (
           <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
-            {error}
+            {error.message}
           </div>
         )}
 
@@ -414,4 +413,3 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     </Card>
   );
 };
-

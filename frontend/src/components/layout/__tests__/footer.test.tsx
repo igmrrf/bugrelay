@@ -61,7 +61,7 @@ describe('Footer', () => {
   it('renders copyright notice', () => {
     render(<Footer />)
     
-    expect(screen.getByText(/© 2024 BugRelay. All rights reserved./)).toBeInTheDocument()
+    expect(screen.getByText(/© 2025 BugRelay. All rights reserved./)).toBeInTheDocument()
   })
 
   it('renders developer community message', () => {

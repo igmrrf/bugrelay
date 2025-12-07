@@ -73,7 +73,7 @@ describe('Textarea', () => {
     expect(handleChange).toHaveBeenCalledTimes(4) // One for each character
   })
 
-  it('handles focus and blur events', async () => {
+  it('handles focus and blur-sm events', async () => {
     const handleFocus = jest.fn()
     const handleBlur = jest.fn()
     const user = userEvent.setup()
@@ -159,7 +159,7 @@ describe('Textarea', () => {
     
     const textarea = screen.getByPlaceholderText('Focus styling')
     expect(textarea).toHaveClass(
-      'focus-visible:outline-none',
+      'focus-visible:outline-hidden',
       'focus-visible:ring-2',
       'focus-visible:ring-ring',
       'focus-visible:ring-offset-2'

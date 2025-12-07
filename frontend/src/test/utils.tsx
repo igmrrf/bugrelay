@@ -37,7 +37,7 @@ export const mockBug = {
   tags: ['ui', 'crash'],
   voteCount: 5,
   commentCount: 3,
-  createdAt: '2024-01-01T00:00:00Z',
+  createdAt: '2025-01-01T00:00:00Z',
   application: {
     name: 'Test App',
     company: {
@@ -61,8 +61,8 @@ export const mockUser = {
   website: 'https://example.com',
   githubUsername: 'testuser',
   twitterUsername: 'testuser',
-  createdAt: '2024-01-01T00:00:00Z',
-  lastActiveAt: '2024-01-01T00:00:00Z',
+  createdAt: '2025-01-01T00:00:00Z',
+  lastActiveAt: '2025-01-01T00:00:00Z',
 }
 
 export const mockCompany = {
@@ -71,7 +71,7 @@ export const mockCompany = {
   domain: 'example.com',
   isVerified: true,
   bugCount: 10,
-  createdAt: '2024-01-01T00:00:00Z',
+  createdAt: '2025-01-01T00:00:00Z',
   applications: [
     {
       id: '1',

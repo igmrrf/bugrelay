@@ -13,7 +13,7 @@ export interface User {
   isAdmin: boolean;
   isEmailVerified: boolean;
   authProvider: "google" | "github" | "email";
-  companyMemberships?: CompanyMember[];
+  companyMemberships: CompanyMember[];
   createdAt: string;
   lastActiveAt: string;
 
@@ -78,7 +78,6 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           isInitialized: true,
         });
-        console.log({ user });
         loadingManager.stop("auth.login");
       },
 
