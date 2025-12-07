@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Bug, Menu, Search, User, User2Icon } from "lucide-react";
+import { Bug, Menu, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/lib/stores";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Header = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -75,6 +76,7 @@ export const Header = () => {
 
         {/* User Actions */}
         <div className="flex items-center space-x-4">
+          <ThemeToggle />
           {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger>

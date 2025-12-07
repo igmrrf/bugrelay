@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { useState, useEffect } from "react";
 import { useUIStore } from "@/lib/stores";
 import { useAutoSync } from "@/lib/sync-manager";
@@ -88,7 +89,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProvidersInner>{children}</ProvidersInner>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ProvidersInner>{children}</ProvidersInner>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
