@@ -1,958 +1,1070 @@
-# Production Environment Setup
+# Digital Ocean Production Setup Guide
 
-This guide covers deploying BugRelay to production with high availability, security, and monitoring. It includes multiple deployment options and best practices for production environments.
+This guide provides step-by-step instructions for setting up a Digital Ocean Droplet for BugRelay production deployment.
 
 ## Prerequisites
 
-### System Requirements
+- Digital Ocean account with billing configured
+- Domain name registered and accessible for DNS configuration
+- SSH client installed on your local machine
+- Basic knowledge of Linux system administration
 
-**Minimum Requirements:**
-- **CPU**: 2 cores
-- **RAM**: 4GB
-- **Storage**: 20GB SSD
-- **Network**: 100 Mbps
+## 1. Create Digital Ocean Droplet
 
-**Recommended Requirements:**
-- **CPU**: 4+ cores
-- **RAM**: 8GB+
-- **Storage**: 50GB+ SSD with backup
-- **Network**: 1 Gbps
-- **Load Balancer**: For high availability
+### 1.1 Droplet Specifications
 
-### Infrastructure Requirements
+Log into Digital Ocean and create a new Droplet with the following specifications:
 
-1. **Domain Name**: Registered domain with DNS control
-2. **SSL Certificate**: Valid SSL certificate (Let's Encrypt recommended)
-3. **Database**: PostgreSQL 13+ (managed service recommended)
-4. **Cache**: Redis 6+ (managed service recommended)
-5. **Storage**: File storage for uploads (S3-compatible recommended)
-6. **Monitoring**: Log aggregation and metrics collection
-7. **Backup**: Automated backup solution
+**Recommended Configuration:**
+- **Image**: Ubuntu 22.04 LTS x64
+- **Plan**: Basic or General Purpose
+- **CPU**: 4 vCPUs (minimum 2 vCPUs)
+- **RAM**: 8GB (minimum 4GB)
+- **Storage**: 160GB SSD (minimum 80GB)
+- **Datacenter Region**: Choose closest to your users
+- **VPC Network**: Default VPC is fine
+- **IPv6**: Enable (optional but recommended)
+- **Monitoring**: Enable (free)
+- **Backups**: Enable (recommended, additional cost)
 
-## Deployment Options
+### 1.2 Initial Droplet Configuration
 
-### Option 1: Docker Compose (Recommended)
+**Authentication:**
+- Add your SSH public key during droplet creation
+- Or use password authentication initially (will disable later)
 
-Best for small to medium deployments with single-server setup.
+**Hostname:**
+- Set hostname to: `bugrelay-production`
 
-**Advantages:**
-- Easy to deploy and manage
-- All services included
-- Consistent environment
-- Built-in health checks
+**Tags:**
+- Add tags: `production`, `bugrelay`, `web-server`
 
-**Use Cases:**
-- Small to medium applications
-- Single server deployments
-- Quick production setup
+### 1.3 Create Droplet
 
-### Option 2: Kubernetes
+Click "Create Droplet" and wait for provisioning (usually 1-2 minutes).
 
-Best for large-scale deployments requiring high availability.
+Once created, note your droplet's IP address: `123.45.67.89`
 
-**Advantages:**
-- Auto-scaling
-- Rolling updates
-- Service discovery
-- Multi-region support
+## 2. Initial Server Access
 
-**Use Cases:**
-- Enterprise deployments
-- High-traffic applications
-- Multi-region setups
-
-### Option 3: Cloud Services
-
-Best for managed infrastructure with minimal operational overhead.
-
-**Advantages:**
-- Managed databases and cache
-- Auto-scaling
-- Built-in monitoring
-- Reduced operational overhead
-
-**Use Cases:**
-- Teams without DevOps expertise
-- Rapid scaling requirements
-- Compliance requirements
-
-## Docker Compose Deployment
-
-### 1. Server Preparation
+### 2.1 First SSH Connection
 
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+# Connect as root (initial connection)
+ssh root@123.45.67.89
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Verify installation
-docker --version
-docker-compose --version
+# If using password, you'll be prompted to enter it
+# If using SSH key, you should connect automatically
 ```
 
-### 2. Application Setup
+### 2.2 Update System Packages
 
 ```bash
-# Create application directory
-sudo mkdir -p /opt/bugrelay
-cd /opt/bugrelay
+# Update package lists
+apt update
 
-# Download production files
-wget https://github.com/your-org/bugrelay/archive/main.zip
-unzip main.zip
-mv bugrelay-main/* .
-rm -rf bugrelay-main main.zip
+# Upgrade all packages
+apt upgrade -y
 
-# Set up environment
-cp .env.prod.example .env.prod
+# Install essential packages
+apt install -y \
+  curl \
+  wget \
+  git \
+  vim \
+  htop \
+  ufw \
+  fail2ban \
+  unattended-upgrades \
+  software-properties-common \
+  apt-transport-https \
+  ca-certificates \
+  gnupg \
+  lsb-release
 ```
 
-### 3. Configuration
+## 3. Create Deployment User
 
-Edit `.env.prod` with your production values:
+### 3.1 Create User Account
 
 ```bash
-# Database Configuration
-DB_NAME=bugrelay_production
-DB_USER=bugrelay_user
-DB_PASSWORD=your_secure_database_password
+# Create deploy user
+adduser deploy
 
-# Redis Configuration
-REDIS_PASSWORD=your_secure_redis_password
-
-# JWT Configuration
-JWT_SECRET=your_super_secure_jwt_secret_minimum_32_characters
-JWT_ACCESS_TOKEN_TTL=15m
-JWT_REFRESH_TOKEN_TTL=168h
-
-# OAuth Configuration
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-OAUTH_REDIRECT_URL=https://yourdomain.com/api/v1/auth/oauth/callback
-
-# reCAPTCHA Configuration
-RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
-NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
-
-# Frontend Configuration
-NEXT_PUBLIC_API_URL=https://yourdomain.com/api/v1
-
-# Domain Configuration
-DOMAIN=yourdomain.com
+# You'll be prompted to set a password
+# Enter a strong password and save it securely
+# Press Enter to skip optional fields (Full Name, etc.)
 ```
 
-### 4. SSL Certificate Setup
-
-#### Using Let's Encrypt (Recommended)
+### 3.2 Grant Sudo Privileges
 
 ```bash
-# Install Certbot
-sudo apt install certbot python3-certbot-nginx
+# Add deploy user to sudo group
+usermod -aG sudo deploy
 
-# Obtain certificate
-sudo certbot certonly --standalone -d yourdomain.com -d api.yourdomain.com
-
-# Set up auto-renewal
-sudo crontab -e
-# Add: 0 12 * * * /usr/bin/certbot renew --quiet
+# Verify user was added
+groups deploy
+# Output should include: deploy sudo
 ```
 
-#### Using Custom Certificate
+### 3.3 Configure Sudo Without Password (Optional)
+
+For automated deployments, configure sudo without password:
 
 ```bash
-# Create SSL directory
-sudo mkdir -p /opt/bugrelay/ssl
+# Edit sudoers file
+visudo
 
-# Copy your certificate files
-sudo cp your-certificate.crt /opt/bugrelay/ssl/
-sudo cp your-private-key.key /opt/bugrelay/ssl/
+# Add this line at the end:
+deploy ALL=(ALL) NOPASSWD:ALL
+
+# Save and exit (Ctrl+X, Y, Enter)
+```
+
+## 4. SSH Key Setup and Security
+
+### 4.1 Generate SSH Key Pair (On Your Local Machine)
+
+```bash
+# Generate a new SSH key pair specifically for deployment
+ssh-keygen -t ed25519 -C "deploy@bugrelay.com" -f ~/.ssh/bugrelay_deploy
+
+# This creates:
+# - Private key: ~/.ssh/bugrelay_deploy
+# - Public key: ~/.ssh/bugrelay_deploy.pub
 
 # Set proper permissions
-sudo chmod 600 /opt/bugrelay/ssl/*
+chmod 600 ~/.ssh/bugrelay_deploy
+chmod 644 ~/.ssh/bugrelay_deploy.pub
 ```
 
-### 5. Deployment
+### 4.2 Copy Public Key to Server
 
 ```bash
-# Deploy using the automated script
-chmod +x scripts/deploy-prod.sh
-./scripts/deploy-prod.sh
+# Method 1: Using ssh-copy-id (easiest)
+ssh-copy-id -i ~/.ssh/bugrelay_deploy.pub deploy@123.45.67.89
 
-# Or deploy manually
-docker-compose -f docker-compose.prod.yml up -d
+# Method 2: Manual copy
+# On your local machine, display the public key:
+cat ~/.ssh/bugrelay_deploy.pub
 
-# Check deployment
-docker-compose -f docker-compose.prod.yml ps
+# On the server (as root):
+mkdir -p /home/deploy/.ssh
+nano /home/deploy/.ssh/authorized_keys
+# Paste the public key content, save and exit
+
+# Set proper permissions
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
-### 6. Verification
+### 4.3 Test SSH Key Authentication
 
 ```bash
-# Check service health
-curl -f https://yourdomain.com/health
-curl -f https://yourdomain.com/api/v1/status
+# From your local machine
+ssh -i ~/.ssh/bugrelay_deploy deploy@123.45.67.89
 
-# Check logs
-docker-compose -f docker-compose.prod.yml logs -f backend
-docker-compose -f docker-compose.prod.yml logs -f frontend
+# You should connect without password prompt
 ```
 
-## Kubernetes Deployment
-
-### 1. Cluster Setup
+### 4.4 Harden SSH Configuration
 
 ```bash
-# Install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+# On the server (as root or with sudo)
+sudo nano /etc/ssh/sshd_config
 
-# Install Helm
-curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-sudo apt-get update
-sudo apt-get install helm
+# Make the following changes:
 ```
 
-### 2. Namespace and Secrets
+Add or modify these lines:
+
+```
+# Disable root login
+PermitRootLogin no
+
+# Disable password authentication
+PasswordAuthentication no
+PubkeyAuthentication yes
+
+# Disable empty passwords
+PermitEmptyPasswords no
+
+# Disable X11 forwarding
+X11Forwarding no
+
+# Allow only specific user
+AllowUsers deploy
+
+# Change default SSH port (optional but recommended)
+# Port 2222
+
+# Use strong ciphers
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
+```
+
+Save and restart SSH:
 
 ```bash
-# Create namespace
-kubectl create namespace bugrelay
+# Test configuration
+sudo sshd -t
 
-# Create secrets
-kubectl create secret generic bugrelay-secrets \
-  --from-literal=db-password=your_secure_password \
-  --from-literal=redis-password=your_redis_password \
-  --from-literal=jwt-secret=your_jwt_secret \
-  --namespace=bugrelay
+# If no errors, restart SSH
+sudo systemctl restart sshd
 
-# Create TLS secret
-kubectl create secret tls bugrelay-tls \
-  --cert=path/to/tls.crt \
-  --key=path/to/tls.key \
-  --namespace=bugrelay
+# IMPORTANT: Keep your current SSH session open
+# Open a NEW terminal and test connection before closing this one
+ssh -i ~/.ssh/bugrelay_deploy deploy@123.45.67.89
 ```
 
-### 3. Database Setup
+## 5. Firewall Configuration
 
-```yaml
-# postgres.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: postgres
-  namespace: bugrelay
-spec:
-  serviceName: postgres
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-      - name: postgres
-        image: postgres:15-alpine
-        env:
-        - name: POSTGRES_DB
-          value: bugrelay_production
-        - name: POSTGRES_USER
-          value: bugrelay_user
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: bugrelay-secrets
-              key: db-password
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-storage
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 20Gi
-```
-
-### 4. Application Deployment
-
-```yaml
-# backend.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backend
-  namespace: bugrelay
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: backend
-  template:
-    metadata:
-      labels:
-        app: backend
-    spec:
-      containers:
-      - name: backend
-        image: bugrelay/backend:latest
-        env:
-        - name: DB_HOST
-          value: postgres
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: bugrelay-secrets
-              key: db-password
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: bugrelay-secrets
-              key: jwt-secret
-        ports:
-        - containerPort: 8080
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-```
-
-### 5. Ingress Configuration
-
-```yaml
-# ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: bugrelay-ingress
-  namespace: bugrelay
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-spec:
-  tls:
-  - hosts:
-    - yourdomain.com
-    - api.yourdomain.com
-    secretName: bugrelay-tls
-  rules:
-  - host: yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: 3000
-  - host: api.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: backend
-            port:
-              number: 8080
-```
-
-## Cloud Services Deployment
-
-### AWS Deployment
-
-#### Using AWS ECS with Fargate
+### 5.1 Configure UFW (Uncomplicated Firewall)
 
 ```bash
-# Install AWS CLI
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
+# Check UFW status
+sudo ufw status
 
-# Configure AWS CLI
-aws configure
-
-# Create ECS cluster
-aws ecs create-cluster --cluster-name bugrelay-production
-
-# Create task definition
-aws ecs register-task-definition --cli-input-json file://task-definition.json
-
-# Create service
-aws ecs create-service \
-  --cluster bugrelay-production \
-  --service-name bugrelay-backend \
-  --task-definition bugrelay-backend:1 \
-  --desired-count 2 \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}"
-```
-
-#### Using AWS App Runner
-
-```yaml
-# apprunner.yaml
-version: 1.0
-runtime: docker
-build:
-  commands:
-    build:
-      - echo "Build started on `date`"
-      - docker build -t bugrelay-backend .
-run:
-  runtime-version: latest
-  command: ./main
-  network:
-    port: 8080
-    env: PORT
-  env:
-    - name: DB_HOST
-      value: your-rds-endpoint
-    - name: REDIS_HOST
-      value: your-elasticache-endpoint
-```
-
-### Google Cloud Platform
-
-#### Using Cloud Run
-
-```bash
-# Install gcloud CLI
-curl https://sdk.cloud.google.com | bash
-exec -l $SHELL
-gcloud init
-
-# Build and push image
-gcloud builds submit --tag gcr.io/PROJECT-ID/bugrelay-backend
-
-# Deploy to Cloud Run
-gcloud run deploy bugrelay-backend \
-  --image gcr.io/PROJECT-ID/bugrelay-backend \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars DB_HOST=your-cloud-sql-ip,REDIS_HOST=your-memorystore-ip
-```
-
-### Azure Deployment
-
-#### Using Container Instances
-
-```bash
-# Install Azure CLI
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-# Login to Azure
-az login
-
-# Create resource group
-az group create --name bugrelay-rg --location eastus
-
-# Create container instance
-az container create \
-  --resource-group bugrelay-rg \
-  --name bugrelay-backend \
-  --image bugrelay/backend:latest \
-  --dns-name-label bugrelay-api \
-  --ports 8080 \
-  --environment-variables \
-    DB_HOST=your-postgres-server.postgres.database.azure.com \
-    REDIS_HOST=your-redis-cache.redis.cache.windows.net
-```
-
-## Security Configuration
-
-### 1. Firewall Setup
-
-```bash
-# Configure UFW (Ubuntu)
+# Set default policies
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow ssh
+
+# Allow SSH (use your SSH port if you changed it)
+sudo ufw allow 22/tcp
+# Or if you changed SSH port to 2222:
+# sudo ufw allow 2222/tcp
+
+# Allow HTTP and HTTPS
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
+
+# Allow monitoring (optional, for external monitoring)
+# sudo ufw allow from trusted_ip to any port 9090 proto tcp
+
+# Enable firewall
 sudo ufw enable
 
-# Or configure iptables
-sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -j DROP
+# Verify rules
+sudo ufw status verbose
 ```
 
-### 2. Fail2Ban Setup
+### 5.2 Configure Fail2Ban
 
 ```bash
-# Install Fail2Ban
-sudo apt install fail2ban
+# Install fail2ban (if not already installed)
+sudo apt install -y fail2ban
 
-# Configure Fail2Ban
+# Create local configuration
 sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 
 # Edit configuration
 sudo nano /etc/fail2ban/jail.local
-# Set: enabled = true, bantime = 3600, maxretry = 3
-
-# Restart Fail2Ban
-sudo systemctl restart fail2ban
 ```
 
-### 3. Security Headers
+Configure SSH protection:
 
-Nginx configuration for security headers:
-
-```nginx
-# /etc/nginx/conf.d/security.conf
-add_header X-Frame-Options "SAMEORIGIN" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header Referrer-Policy "no-referrer-when-downgrade" always;
-add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+```ini
+[sshd]
+enabled = true
+port = 22
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+findtime = 600
 ```
 
-## Monitoring and Logging
-
-### 1. Prometheus and Grafana
-
-```yaml
-# monitoring/docker-compose.yml
-version: '3.8'
-services:
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=secure_password
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-
-volumes:
-  prometheus_data:
-  grafana_data:
-```
-
-### 2. Log Aggregation
-
-```yaml
-# logging/docker-compose.yml
-version: '3.8'
-services:
-  loki:
-    image: grafana/loki:latest
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
-      - loki_data:/loki
-
-  promtail:
-    image: grafana/promtail:latest
-    volumes:
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./promtail-config.yaml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
-
-volumes:
-  loki_data:
-```
-
-## Backup and Recovery
-
-### 1. Database Backup
+Start and enable fail2ban:
 
 ```bash
-#!/bin/bash
-# backup-db.sh
+# Start fail2ban
+sudo systemctl start fail2ban
+sudo systemctl enable fail2ban
 
-BACKUP_DIR="/opt/backups/bugrelay"
-DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="bugrelay_production"
-DB_USER="bugrelay_user"
-
-# Create backup directory
-mkdir -p $BACKUP_DIR
-
-# Create backup
-docker-compose exec -T postgres pg_dump -U $DB_USER -d $DB_NAME | gzip > $BACKUP_DIR/backup_$DATE.sql.gz
-
-# Upload to S3 (optional)
-aws s3 cp $BACKUP_DIR/backup_$DATE.sql.gz s3://your-backup-bucket/database/
-
-# Keep only last 30 days
-find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +30 -delete
-
-echo "Backup completed: backup_$DATE.sql.gz"
+# Check status
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
 ```
 
-### 2. File Backup
+## 6. Install Docker and Docker Compose
+
+### 6.1 Install Docker
 
 ```bash
-#!/bin/bash
-# backup-files.sh
+# Remove old versions
+sudo apt remove docker docker-engine docker.io containerd runc
 
-BACKUP_DIR="/opt/backups/bugrelay"
-DATE=$(date +%Y%m%d_%H%M%S)
-UPLOAD_DIR="/opt/bugrelay/uploads"
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
-# Create backup
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz -C $UPLOAD_DIR .
+# Set up stable repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Upload to S3 (optional)
-aws s3 cp $BACKUP_DIR/uploads_$DATE.tar.gz s3://your-backup-bucket/uploads/
+# Install Docker Engine
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Keep only last 7 days for file backups
-find $BACKUP_DIR -name "uploads_*.tar.gz" -mtime +7 -delete
-
-echo "File backup completed: uploads_$DATE.tar.gz"
+# Verify installation
+docker --version
+docker compose version
 ```
 
-### 3. Automated Backup Schedule
+### 6.2 Configure Docker for Deploy User
 
 ```bash
-# Add to crontab
-crontab -e
+# Add deploy user to docker group
+sudo usermod -aG docker deploy
 
-# Database backup every 6 hours
-0 */6 * * * /opt/bugrelay/scripts/backup-db.sh
+# Verify
+groups deploy
 
-# File backup daily at 2 AM
-0 2 * * * /opt/bugrelay/scripts/backup-files.sh
+# Log out and log back in for group changes to take effect
+exit
+ssh -i ~/.ssh/bugrelay_deploy deploy@123.45.67.89
 
-# System backup weekly
-0 3 * * 0 /opt/bugrelay/scripts/backup-system.sh
+# Test Docker without sudo
+docker ps
 ```
 
-## Performance Optimization
+### 6.3 Configure Docker Daemon
 
-### 1. Database Optimization
+```bash
+# Create daemon configuration
+sudo nano /etc/docker/daemon.json
+```
+
+Add the following configuration:
+
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "userland-proxy": false
+}
+```
+
+Restart Docker:
+
+```bash
+sudo systemctl restart docker
+sudo systemctl enable docker
+```
+
+## 7. Install Nginx
+
+### 7.1 Install Nginx
+
+```bash
+# Install Nginx
+sudo apt install -y nginx
+
+# Start and enable Nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# Verify installation
+nginx -v
+sudo systemctl status nginx
+```
+
+### 7.2 Configure Nginx
+
+```bash
+# Remove default site
+sudo rm /etc/nginx/sites-enabled/default
+
+# Create directory for SSL certificates
+sudo mkdir -p /etc/nginx/ssl
+
+# Create directory for site configurations
+sudo mkdir -p /etc/nginx/sites-available
+sudo mkdir -p /etc/nginx/sites-enabled
+```
+
+### 7.3 Test Nginx
+
+```bash
+# Test configuration
+sudo nginx -t
+
+# If successful, reload Nginx
+sudo systemctl reload nginx
+
+# Visit http://your-droplet-ip in browser
+# You should see Nginx welcome page
+```
+
+## 8. SSL Certificate Setup (Let's Encrypt)
+
+### 8.1 Install Certbot
+
+```bash
+# Install Certbot and Nginx plugin
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+### 8.2 Configure DNS Records
+
+Before obtaining SSL certificates, configure your DNS:
+
+**A Records:**
+```
+bugrelay.com                → 123.45.67.89
+www.bugrelay.com            → 123.45.67.89
+monitoring.bugrelay.com     → 123.45.67.89
+docs.bugrelay.com           → 123.45.67.89
+```
+
+Wait for DNS propagation (can take up to 48 hours, usually much faster).
+
+Verify DNS:
+```bash
+# Check DNS resolution
+dig bugrelay.com +short
+dig monitoring.bugrelay.com +short
+```
+
+### 8.3 Obtain SSL Certificates
+
+```bash
+# Stop Nginx temporarily
+sudo systemctl stop nginx
+
+# Obtain certificates for all domains
+sudo certbot certonly --standalone \
+  -d bugrelay.com \
+  -d www.bugrelay.com \
+  -d monitoring.bugrelay.com \
+  -d docs.bugrelay.com \
+  --email admin@bugrelay.com \
+  --agree-tos \
+  --non-interactive
+
+# Start Nginx
+sudo systemctl start nginx
+```
+
+Certificates will be stored in:
+- `/etc/letsencrypt/live/bugrelay.com/fullchain.pem`
+- `/etc/letsencrypt/live/bugrelay.com/privkey.pem`
+
+### 8.4 Configure Auto-Renewal
+
+```bash
+# Test renewal
+sudo certbot renew --dry-run
+
+# Enable automatic renewal (already enabled by default)
+sudo systemctl status certbot.timer
+
+# Manually enable if needed
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer
+```
+
+## 9. Install PostgreSQL
+
+### 9.1 Install PostgreSQL
+
+```bash
+# Install PostgreSQL
+sudo apt install -y postgresql postgresql-contrib
+
+# Start and enable PostgreSQL
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Verify installation
+psql --version
+sudo systemctl status postgresql
+```
+
+### 9.2 Configure PostgreSQL
+
+```bash
+# Switch to postgres user
+sudo -u postgres psql
+
+# In PostgreSQL prompt:
+```
 
 ```sql
--- PostgreSQL configuration optimizations
--- Edit postgresql.conf
+-- Create database
+CREATE DATABASE bugrelay_production;
 
-# Memory settings
-shared_buffers = 256MB
-effective_cache_size = 1GB
-work_mem = 4MB
-maintenance_work_mem = 64MB
+-- Create user
+CREATE USER bugrelay_user WITH ENCRYPTED PASSWORD 'your_secure_password_here';
 
-# Connection settings
-max_connections = 100
-max_prepared_transactions = 100
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE bugrelay_production TO bugrelay_user;
 
-# Logging
-log_min_duration_statement = 1000
-log_checkpoints = on
-log_connections = on
-log_disconnections = on
-
-# Performance
-checkpoint_completion_target = 0.9
-wal_buffers = 16MB
-default_statistics_target = 100
+-- Exit
+\q
 ```
 
-### 2. Redis Optimization
+### 9.3 Configure PostgreSQL for Local Connections
 
 ```bash
-# Redis configuration optimizations
-# Edit redis.conf
+# Edit pg_hba.conf
+sudo nano /etc/postgresql/14/main/pg_hba.conf
 
-# Memory management
-maxmemory 512mb
+# Add this line for local connections:
+# local   bugrelay_production   bugrelay_user   md5
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+```
+
+### 9.4 Test Database Connection
+
+```bash
+# Test connection
+psql -U bugrelay_user -d bugrelay_production -h localhost
+
+# Enter password when prompted
+# If successful, you'll see PostgreSQL prompt
+# Exit with \q
+```
+
+## 10. Install Redis
+
+### 10.1 Install Redis
+
+```bash
+# Install Redis
+sudo apt install -y redis-server
+
+# Start and enable Redis
+sudo systemctl start redis-server
+sudo systemctl enable redis-server
+
+# Verify installation
+redis-cli --version
+sudo systemctl status redis-server
+```
+
+### 10.2 Configure Redis
+
+```bash
+# Edit Redis configuration
+sudo nano /etc/redis/redis.conf
+```
+
+Make these changes:
+
+```
+# Set password
+requirepass your_secure_redis_password
+
+# Bind to localhost only
+bind 127.0.0.1 ::1
+
+# Set max memory
+maxmemory 2gb
 maxmemory-policy allkeys-lru
 
-# Persistence
+# Enable persistence
 save 900 1
 save 300 10
 save 60 10000
-
-# Network
-tcp-keepalive 300
-timeout 0
-
-# Security
-requirepass your_secure_redis_password
 ```
 
-### 3. Application Optimization
+Restart Redis:
 
 ```bash
-# Go application optimizations
-# Environment variables
-
-# Garbage collector
-GOGC=100
-GOMEMLIMIT=1GiB
-
-# Runtime
-GOMAXPROCS=4
-GODEBUG=gctrace=1
-
-# Connection pooling
-DB_MAX_OPEN_CONNS=25
-DB_MAX_IDLE_CONNS=5
-DB_CONN_MAX_LIFETIME=5m
+sudo systemctl restart redis-server
 ```
 
-## Scaling
+### 10.3 Test Redis Connection
 
-### 1. Horizontal Scaling
+```bash
+# Test connection
+redis-cli
 
-```yaml
-# docker-compose.prod.yml - scaled version
-version: '3.8'
-services:
-  backend:
-    image: bugrelay/backend:latest
-    deploy:
-      replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
-      restart_policy:
-        condition: on-failure
-    environment:
-      - DB_HOST=postgres
-      - REDIS_HOST=redis
-    depends_on:
-      - postgres
-      - redis
+# Authenticate
+AUTH your_secure_redis_password
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - backend
+# Test command
+PING
+# Should return: PONG
+
+# Exit
+exit
 ```
 
-### 2. Load Balancer Configuration
+## 11. Setup Application Directory
+
+### 11.1 Create Directory Structure
+
+```bash
+# Create application directory
+sudo mkdir -p /opt/bugrelay
+sudo chown deploy:deploy /opt/bugrelay
+
+# Create subdirectories
+cd /opt/bugrelay
+mkdir -p backups logs ssl
+
+# Set permissions
+chmod 755 /opt/bugrelay
+chmod 700 /opt/bugrelay/backups
+chmod 755 /opt/bugrelay/logs
+chmod 700 /opt/bugrelay/ssl
+```
+
+### 11.2 Clone Repository
+
+```bash
+# Switch to deploy user
+su - deploy
+
+# Navigate to application directory
+cd /opt/bugrelay
+
+# Clone repository (you'll need to set up deploy keys in GitHub)
+git clone git@github.com:your-org/bugrelay.git .
+
+# Or use HTTPS with personal access token
+git clone https://github.com/your-org/bugrelay.git .
+```
+
+## 12. Configure Environment Variables
+
+### 12.1 Create Environment File
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit environment file
+nano .env
+```
+
+### 12.2 Set Production Values
+
+```bash
+# Application
+NODE_ENV=production
+GO_ENV=production
+BACKEND_PORT=8080
+FRONTEND_PORT=3000
+
+# Domain
+DOMAIN=bugrelay.com
+API_URL=https://bugrelay.com/api/v1
+FRONTEND_URL=https://bugrelay.com
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=bugrelay_production
+DB_USER=bugrelay_user
+DB_PASSWORD=your_secure_database_password
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_secure_redis_password
+
+# Security
+JWT_SECRET=your_super_secure_jwt_secret_minimum_32_characters
+LOGS_API_KEY=your_secure_logs_api_key
+
+# Monitoring
+GRAFANA_ADMIN_PASSWORD=your_secure_grafana_password
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK
+```
+
+### 12.3 Secure Environment File
+
+```bash
+# Set proper permissions
+chmod 600 .env
+chown deploy:deploy .env
+```
+
+## 13. Configure Systemd Services
+
+### 13.1 Create Backend Service
+
+```bash
+sudo nano /etc/systemd/system/bugrelay-backend.service
+```
+
+Add:
+
+```ini
+[Unit]
+Description=BugRelay Backend API
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/bugrelay/backend
+EnvironmentFile=/opt/bugrelay/.env
+ExecStart=/opt/bugrelay/backend/bugrelay-api
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/bugrelay/logs/backend.log
+StandardError=append:/opt/bugrelay/logs/backend-error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 13.2 Create Frontend Service
+
+```bash
+sudo nano /etc/systemd/system/bugrelay-frontend.service
+```
+
+Add:
+
+```ini
+[Unit]
+Description=BugRelay Frontend
+After=network.target bugrelay-backend.service
+Wants=bugrelay-backend.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/bugrelay/frontend
+EnvironmentFile=/opt/bugrelay/.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/bugrelay/logs/frontend.log
+StandardError=append:/opt/bugrelay/logs/frontend-error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 13.3 Reload Systemd
+
+```bash
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Services will be started by deployment scripts
+```
+
+## 14. Configure Nginx for BugRelay
+
+### 14.1 Create Nginx Configuration
+
+```bash
+sudo nano /etc/nginx/sites-available/bugrelay.conf
+```
+
+Add basic configuration (will be updated by deployment):
 
 ```nginx
-# nginx.conf - load balancing
-upstream backend_servers {
-    least_conn;
-    server backend_1:8080 max_fails=3 fail_timeout=30s;
-    server backend_2:8080 max_fails=3 fail_timeout=30s;
-    server backend_3:8080 max_fails=3 fail_timeout=30s;
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bugrelay.com www.bugrelay.com;
+    return 301 https://$server_name$request_uri;
 }
 
+# Main application
 server {
     listen 443 ssl http2;
-    server_name api.yourdomain.com;
+    listen [::]:443 ssl http2;
+    server_name bugrelay.com www.bugrelay.com;
 
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/bugrelay.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bugrelay.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Frontend
     location / {
-        proxy_pass http://backend_servers;
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Backend API
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Health checks
-        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 10s;
-        proxy_read_timeout 10s;
     }
 }
 ```
 
-## Maintenance
-
-### 1. Updates and Patches
+### 14.2 Enable Site
 
 ```bash
-#!/bin/bash
-# update-production.sh
+# Create symbolic link
+sudo ln -s /etc/nginx/sites-available/bugrelay.conf /etc/nginx/sites-enabled/
 
-# Backup before update
-./scripts/backup-db.sh
-./scripts/backup-files.sh
+# Test configuration
+sudo nginx -t
 
-# Pull latest images
-docker-compose -f docker-compose.prod.yml pull
-
-# Rolling update
-docker-compose -f docker-compose.prod.yml up -d --no-deps backend
-sleep 30
-docker-compose -f docker-compose.prod.yml up -d --no-deps frontend
-
-# Verify deployment
-curl -f https://yourdomain.com/health || exit 1
-
-# Clean up old images
-docker image prune -f
-
-echo "Update completed successfully"
+# Reload Nginx
+sudo systemctl reload nginx
 ```
 
-### 2. Health Monitoring
+## 15. Setup Monitoring Stack
+
+### 15.1 Deploy Monitoring with Docker Compose
 
 ```bash
-#!/bin/bash
-# health-check.sh
+# Navigate to monitoring directory
+cd /opt/bugrelay/monitoring
 
-ENDPOINTS=(
-    "https://yourdomain.com/health"
-    "https://yourdomain.com/api/v1/status"
-)
+# Start monitoring stack
+docker compose up -d
 
-for endpoint in "${ENDPOINTS[@]}"; do
-    if ! curl -f -s "$endpoint" > /dev/null; then
-        echo "ALERT: $endpoint is not responding"
-        # Send alert (email, Slack, PagerDuty, etc.)
-        exit 1
-    fi
-done
-
-echo "All endpoints are healthy"
+# Verify services
+docker compose ps
 ```
 
-### 3. Log Rotation
+### 15.2 Configure Monitoring Access
 
 ```bash
-# /etc/logrotate.d/bugrelay
-/opt/bugrelay/logs/*.log {
-    daily
-    missingok
-    rotate 30
-    compress
-    delaycompress
-    notifempty
-    create 644 root root
-    postrotate
-        docker-compose -f /opt/bugrelay/docker-compose.prod.yml restart backend
-    endscript
+sudo nano /etc/nginx/sites-available/monitoring.conf
+```
+
+Add:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name monitoring.bugrelay.com;
+
+    ssl_certificate /etc/letsencrypt/live/bugrelay.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bugrelay.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 ```
 
+Enable and reload:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/monitoring.conf /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 16. Setup Automated Backups
+
+### 16.1 Create Backup Script
+
+```bash
+nano /opt/bugrelay/scripts/backup.sh
+```
+
+Add backup script (will be created in later tasks).
+
+### 16.2 Configure Cron Job
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add daily backup at 2 AM
+0 2 * * * /opt/bugrelay/scripts/backup.sh >> /opt/bugrelay/logs/backup.log 2>&1
+```
+
+## 17. Final Security Hardening
+
+### 17.1 Configure Automatic Security Updates
+
+```bash
+# Configure unattended upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades
+
+# Edit configuration
+sudo nano /etc/apt/apt.conf.d/50unattended-upgrades
+```
+
+Ensure these lines are uncommented:
+
+```
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}-security";
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+```
+
+### 17.2 Configure System Limits
+
+```bash
+# Edit limits
+sudo nano /etc/security/limits.conf
+
+# Add:
+deploy soft nofile 65536
+deploy hard nofile 65536
+```
+
+### 17.3 Disable Unnecessary Services
+
+```bash
+# List all services
+systemctl list-unit-files --type=service
+
+# Disable unnecessary services (example)
+sudo systemctl disable bluetooth.service
+sudo systemctl disable cups.service
+```
+
+## 18. Verification Checklist
+
+Run through this checklist to verify setup:
+
+```bash
+# System
+[ ] Ubuntu 22.04 LTS installed
+[ ] System packages updated
+[ ] Firewall configured and enabled
+[ ] Fail2ban configured and running
+
+# Users and SSH
+[ ] Deploy user created with sudo access
+[ ] SSH key authentication working
+[ ] Password authentication disabled
+[ ] Root login disabled
+
+# Software
+[ ] Docker installed and running
+[ ] Docker Compose installed
+[ ] Nginx installed and running
+[ ] PostgreSQL installed and running
+[ ] Redis installed and running
+
+# SSL
+[ ] Lets Encrypt certificates obtained
+[ ] Auto-renewal configured
+[ ] HTTPS working for all domains
+
+# Application
+[ ] Application directory created
+[ ] Repository cloned
+[ ] Environment variables configured
+[ ] Systemd services created
+
+# Monitoring
+[ ] Monitoring stack deployed
+[ ] Grafana accessible
+[ ] Prometheus collecting metrics
+
+# Security
+[ ] Firewall rules configured
+[ ] SSH hardened
+[ ] Automatic updates enabled
+[ ] Backups configured
+```
+
+## 19. Next Steps
+
+Your Digital Ocean Droplet is now ready for deployment!
+
+Next steps:
+1. Configure GitHub Secrets for CI/CD
+2. Set up GitHub Actions workflows
+3. Perform initial deployment
+4. Configure monitoring dashboards
+5. Test rollback procedures
+
+See [CI/CD Workflows Guide](ci-cd-workflows.md) for next steps.
+
 ## Troubleshooting
 
-### Common Production Issues
+### Cannot Connect via SSH
 
-1. **High CPU Usage**
-   ```bash
-   # Check container stats
-   docker stats
-   
-   # Check Go profiling
-   curl http://localhost:8080/debug/pprof/profile?seconds=30 > cpu.prof
-   go tool pprof cpu.prof
-   ```
+```bash
+# Check SSH service
+sudo systemctl status sshd
 
-2. **Memory Leaks**
-   ```bash
-   # Check memory usage
-   docker exec backend_container_name cat /proc/meminfo
-   
-   # Go heap profiling
-   curl http://localhost:8080/debug/pprof/heap > heap.prof
-   go tool pprof heap.prof
-   ```
+# Check firewall
+sudo ufw status
 
-3. **Database Performance**
-   ```sql
-   -- Check slow queries
-   SELECT query, mean_time, calls 
-   FROM pg_stat_statements 
-   ORDER BY mean_time DESC 
-   LIMIT 10;
-   
-   -- Check active connections
-   SELECT count(*) FROM pg_stat_activity;
-   ```
+# Check SSH logs
+sudo tail -f /var/log/auth.log
+```
 
-4. **SSL Certificate Issues**
-   ```bash
-   # Check certificate expiry
-   openssl x509 -in /path/to/cert.pem -text -noout | grep "Not After"
-   
-   # Test SSL configuration
-   openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
-   ```
+### Docker Permission Denied
 
-## Security Checklist
+```bash
+# Add user to docker group
+sudo usermod -aG docker deploy
 
-- [ ] Strong passwords for all services
-- [ ] SSL/TLS enabled for all connections
-- [ ] Firewall configured properly
-- [ ] Regular security updates applied
-- [ ] Backup encryption enabled
-- [ ] Access logs monitored
-- [ ] Rate limiting configured
-- [ ] Security headers implemented
-- [ ] OAuth properly configured
-- [ ] Database access restricted
-- [ ] Redis authentication enabled
-- [ ] File upload restrictions in place
+# Log out and back in
+exit
+ssh -i ~/.ssh/bugrelay_deploy deploy@123.45.67.89
+```
 
-## Next Steps
+### Nginx Configuration Error
 
-After production deployment:
+```bash
+# Test configuration
+sudo nginx -t
 
-1. **Set up monitoring dashboards**
-2. **Configure alerting rules**
-3. **Test backup and recovery procedures**
-4. **Implement CI/CD pipeline**
-5. **Set up log analysis**
-6. **Plan scaling strategy**
-7. **Schedule regular maintenance**
+# Check error logs
+sudo tail -f /var/log/nginx/error.log
+```
 
-## Additional Resources
+### Database Connection Failed
 
-- [Configuration Guide](configuration)
-- [Monitoring Documentation](monitoring)
-- [Security Best Practices](../authentication/security)
-- [Troubleshooting Guide](../guides/troubleshooting)
-- [API Documentation](../api/)
+```bash
+# Check PostgreSQL status
+sudo systemctl status postgresql
+
+# Check PostgreSQL logs
+sudo tail -f /var/log/postgresql/postgresql-14-main.log
+
+# Test connection
+psql -U bugrelay_user -d bugrelay_production -h localhost
+```
+
+## Support
+
+For issues with this setup guide, please:
+1. Check the [Troubleshooting Guide](troubleshooting.md)
+2. Review Digital Ocean documentation
+3. Contact the DevOps team
+
+---
+
+**Last Updated**: December 2024  
+**Maintained By**: DevOps Team
