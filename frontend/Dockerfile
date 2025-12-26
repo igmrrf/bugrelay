@@ -3,7 +3,7 @@ FROM node:22-alpine AS base
 
 # Install necessary packages
 RUN apk add --no-cache libc6-compat git wget \
-    && apk upgrade --no-cache
+  && apk upgrade --no-cache
 
 # Development stage
 FROM base AS development
@@ -26,7 +26,7 @@ FROM base AS deps
 WORKDIR /app
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --frozen-lockfile
+RUN npm ci --frozen-lockfile
 
 # Builder stage for production
 FROM base AS builder
@@ -34,8 +34,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Build the application with optimizations
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -45,8 +45,8 @@ WORKDIR /app
 # Install security updates
 RUN apk upgrade --no-cache
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
@@ -72,12 +72,12 @@ USER nextjs
 # Expose port
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Run the application
 CMD ["node", "server.js"]

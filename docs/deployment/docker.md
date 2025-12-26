@@ -452,7 +452,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.0
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
@@ -461,7 +461,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.5.7
     volumes:
       - ./monitoring/loki/config.prod.yml:/etc/loki/local-config.yaml
       - loki_data:/loki

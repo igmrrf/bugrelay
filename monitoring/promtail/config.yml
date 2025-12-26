@@ -17,7 +17,7 @@ scrape_configs:
         labels:
           job: bugrelay-backend
           service: backend
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/bugrelay/*.log
     pipeline_stages:
       - json:
@@ -53,7 +53,7 @@ scrape_configs:
         labels:
           job: bugrelay-frontend
           service: frontend
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/frontend/*.log
     pipeline_stages:
       - json:
@@ -79,7 +79,7 @@ scrape_configs:
           job: nginx
           service: nginx
           log_type: access
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/nginx/access.log
     pipeline_stages:
       - regex:
@@ -98,7 +98,7 @@ scrape_configs:
           job: nginx
           service: nginx
           log_type: error
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/nginx/error.log
     pipeline_stages:
       - regex:
@@ -123,7 +123,7 @@ scrape_configs:
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'stream'
       - target_label: 'environment'
-        replacement: '${ENVIRONMENT:-development}'
+        replacement: 'development'
     pipeline_stages:
       - json:
           expressions:
@@ -143,7 +143,7 @@ scrape_configs:
           - localhost
         labels:
           job: system
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/host/syslog
     pipeline_stages:
       - regex:
@@ -164,7 +164,7 @@ scrape_configs:
         labels:
           job: audit-logs
           service: security
-          environment: ${ENVIRONMENT:-development}
+          environment: development
           __path__: /var/log/bugrelay/audit.log
     pipeline_stages:
       - json:

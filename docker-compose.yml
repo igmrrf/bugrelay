@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database - Base service for both dev and prod
   postgres:
-    image: postgres:17.0-alpine
+    image: postgres:18.1-alpine
     container_name: bugrelay-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-bugrelay}
@@ -24,7 +24,7 @@ services:
 
   # Redis Cache - Base service for both dev and prod
   redis:
-    image: redis:7.4.1-alpine
+    image: redis:8.4.0-alpine
     container_name: bugrelay-redis
     command: >
       sh -c "
@@ -138,7 +138,7 @@ services:
   # Grafana for monitoring - Development Profile
   grafana:
     profiles: ["dev"]
-    image: grafana/grafana:11.3.0
+    image: grafana/grafana:12.3.0
     container_name: bugrelay-grafana-dev
     ports:
       - "3001:3000"
@@ -195,7 +195,7 @@ services:
   # Loki for log aggregation - Development Profile
   loki:
     profiles: ["dev"]
-    image: grafana/loki:3.2.0
+    image: grafana/loki:3.5.7
     container_name: bugrelay-loki-dev
     ports:
       - "3100:3100"
@@ -243,7 +243,7 @@ services:
   # AlertManager for alerting - Development Profile
   alertmanager:
     profiles: ["dev"]
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.29.0
     container_name: bugrelay-alertmanager-dev
     ports:
       - "9093:9093"
@@ -280,7 +280,7 @@ services:
   # Node Exporter for system metrics - Development Profile
   node-exporter:
     profiles: ["dev"]
-    image: prom/node-exporter:v1.8.2
+    image: prom/node-exporter:v1.10.2
     container_name: bugrelay-node-exporter-dev
     ports:
       - "9100:9100"
@@ -426,7 +426,7 @@ services:
   # Grafana for monitoring - Production Profile
   grafana-prod:
     profiles: ["prod"]
-    image: grafana/grafana:11.3.0
+    image: grafana/grafana:12.3.0
     container_name: bugrelay-grafana-prod
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
@@ -480,7 +480,7 @@ services:
   # Loki for log aggregation - Production Profile
   loki-prod:
     profiles: ["prod"]
-    image: grafana/loki:3.2.0
+    image: grafana/loki:3.5.7
     container_name: bugrelay-loki-prod
     environment:
       - LOKI_CACHE_SIZE_MB=500
@@ -523,7 +523,7 @@ services:
   # AlertManager for alerting - Production Profile
   alertmanager-prod:
     profiles: ["prod"]
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.29.0
     container_name: bugrelay-alertmanager-prod
     environment:
       - ENVIRONMENT=production
@@ -565,7 +565,7 @@ services:
   # Node Exporter for system metrics - Production Profile
   node-exporter-prod:
     profiles: ["prod"]
-    image: prom/node-exporter:v1.8.2
+    image: prom/node-exporter:v1.10.2
     container_name: bugrelay-node-exporter-prod
     volumes:
       - /proc:/host/proc:ro
@@ -601,7 +601,7 @@ services:
   # Database backup service - Production Profile
   backup:
     profiles: ["prod"]
-    image: postgres:17.0-alpine
+    image: postgres:18.1-alpine
     container_name: bugrelay-backup-prod
     environment:
       - PGPASSWORD=${DB_PASSWORD}

@@ -34,7 +34,7 @@ GitHub Repository → GitHub Actions → SSH Deployment → Digital Ocean Drople
 - **RAM**: Minimum 8GB (16GB recommended for production)
 - **Storage**: Minimum 100GB SSD (200GB recommended)
 - **Network**: Static IP address with domain name configured
-- **OS**: Ubuntu 22.04 LTS (recommended)
+- **OS**: Ubuntu 24.04 LTS (recommended)
 
 ### Software Requirements
 

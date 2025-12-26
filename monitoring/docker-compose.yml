@@ -1,7 +1,7 @@
 services:
   # Grafana for visualization
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.3.0
     container_name: bugrelay-grafana
     ports:
       - "3001:3000"
@@ -19,7 +19,7 @@ services:
 
   # Loki for log aggregation
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.5.7
     container_name: bugrelay-loki
     ports:
       - "3100:3100"
@@ -71,7 +71,7 @@ services:
 
   # Node Exporter for system metrics
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:1.10.2
     container_name: bugrelay-node-exporter
     ports:
       - "9100:9100"
@@ -90,7 +90,7 @@ services:
 
   # cAdvisor for container metrics
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: bugrelay-cadvisor
     ports:
       - "8080:8080"

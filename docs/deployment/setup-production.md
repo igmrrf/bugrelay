@@ -954,7 +954,7 @@ Run through this checklist to verify setup:
 
 ```bash
 # System
-[ ] Ubuntu 22.04 LTS installed
+[ ] Ubuntu 24.04 LTS installed
 [ ] System packages updated
 [ ] Firewall configured and enabled
 [ ] Fail2ban configured and running
