@@ -1,4 +1,4 @@
-.PHONY: help setup setup-frontend setup-backend setup-docs dev dev-frontend dev-backend dev-docs build build-frontend build-backend build-docs test test-frontend test-backend test-docs docs-dev docs-build docs-generate docs-validate docs-test clean docker-up docker-down
+.PHONY: help setup setup-frontend setup-backend setup-docs dev dev-frontend dev-backend dev-docs build build-frontend build-backend build-docs test test-frontend test-backend test-docs docs-dev docs-build docs-generate docs-validate docs-test clean docker-up docker-down seed
 
 # Default target
 help:
@@ -37,6 +37,7 @@ help:
 	@echo "  make docs-test          - Run comprehensive docs tests"
 	@echo ""
 	@echo "Utility Commands:"
+	@echo "  make seed               - Seed database with sample data"
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make docker-up          - Start Docker services"
 	@echo "  make docker-down        - Stop Docker services"
@@ -121,6 +122,10 @@ docs-test:
 	cd docs && npm run test:comprehensive
 
 # Utility targets
+seed:
+	@echo "Seeding database..."
+	cd backend && DB_HOST=localhost DB_NAME=bugrelay DB_USER=bugrelay_user DB_PASSWORD=bugrelay_password go run cmd/seed/main.go
+
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf frontend/.next frontend/out backend/bin backend/tmp docs/.vitepress/dist docs/.vitepress/cache

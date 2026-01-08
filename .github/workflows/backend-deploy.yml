@@ -1,0 +1,459 @@
+name: Backend Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  GO_VERSION: '1.21'
+  DEPLOYMENT_USER: ${{ secrets.DO_USER }}
+  DEPLOYMENT_HOST: ${{ secrets.DO_HOST }}
+  DEPLOYMENT_PATH: /opt/bugrelay
+  HEALTH_CHECK_TIMEOUT: 60
+  HEALTH_CHECK_RETRIES: 5
+
+jobs:
+  test:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run tests
+        working-directory: backend
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: backend/coverage.out
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+
+      - name: Run golangci-lint
+        working-directory: backend
+        run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+
+      - name: Install gosec
+        run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+      - name: Run security scan
+        working-directory: backend
+        run: gosec -fmt json -out gosec-report.json -stdout ./...
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: backend/gosec-report.json
+
+  build:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Build production binary
+        working-directory: backend
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-w -s -X main.version=${{ github.sha }}" \
+            -o bugrelay-backend \
+            ./main.go
+
+      - name: Create deployment package
+        working-directory: backend
+        run: |
+          mkdir -p deployment-package
+          cp bugrelay-backend deployment-package/
+          cp -r migrations deployment-package/ || true
+          cp .env.example deployment-package/.env.template || true
+          tar -czf bugrelay-backend-${{ github.sha }}.tar.gz deployment-package/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-build
+          path: backend/bugrelay-backend-${{ github.sha }}.tar.gz
+          retention-days: 30
+
+  deploy:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: backend-build
+          path: ./artifacts
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup of current version
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/backups
+            if [ -f ${{ env.DEPLOYMENT_PATH }}/backend/bugrelay-backend ]; then
+              BACKUP_NAME=backend-backup-$(date +%Y%m%d-%H%M%S)
+              sudo cp -r ${{ env.DEPLOYMENT_PATH }}/backend ${{ env.DEPLOYMENT_PATH }}/backups/\$BACKUP_NAME
+              echo \"Backup created: \$BACKUP_NAME\"
+              # Keep only last 5 backups
+              sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/backend-backup-* | tail -n +6 | sudo xargs rm -rf || true
+            fi
+          "
+
+      - name: Deploy new version (Blue-Green)
+        run: |
+          # Transfer new version
+          scp ./artifacts/bugrelay-backend-${{ github.sha }}.tar.gz ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }}:/tmp/
+
+          # Deploy to green environment
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Create green deployment directory
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/backend-green
+            
+            # Extract new version
+            cd /tmp
+            tar -xzf bugrelay-backend-${{ github.sha }}.tar.gz
+            
+            # Copy to green environment
+            sudo cp -r deployment-package/* ${{ env.DEPLOYMENT_PATH }}/backend-green/
+            sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DEPLOYMENT_PATH }}/backend-green
+            sudo chmod +x ${{ env.DEPLOYMENT_PATH }}/backend-green/bugrelay-backend
+            
+            # Copy environment file if it exists
+            if [ -f ${{ env.DEPLOYMENT_PATH }}/backend/.env ]; then
+              sudo cp ${{ env.DEPLOYMENT_PATH }}/backend/.env ${{ env.DEPLOYMENT_PATH }}/backend-green/
+            fi
+            
+            # Start green version on alternate port (8081)
+            cd ${{ env.DEPLOYMENT_PATH }}/backend-green
+            export PORT=8081
+            sudo -E nohup ./bugrelay-backend > /var/log/bugrelay-backend-green.log 2>&1 &
+            echo \$! | sudo tee /var/run/bugrelay-backend-green.pid
+            
+            # Wait for service to start
+            sleep 10
+          "
+
+      - name: Store deployment metadata
+        run: |
+          echo "DEPLOYMENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "DEPLOYMENT_COMMIT=${{ github.sha }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_DEPLOYER=${{ github.actor }}" >> $GITHUB_ENV
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run health checks
+        id: health_check
+        run: |
+          # Health check script
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Running health checks...'
+            
+            # Check if green service is running
+            if ! pgrep -f 'bugrelay-backend' > /dev/null; then
+              echo 'ERROR: Backend service not running'
+              exit 1
+            fi
+            
+            # Check backend API health endpoint (green version on port 8081)
+            for i in \$(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+              if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:8081/health > /dev/null; then
+                echo 'Backend health check: PASS'
+                break
+              else
+                echo \"Backend health check attempt \$i failed\"
+                if [ \$i -eq ${{ env.HEALTH_CHECK_RETRIES }} ]; then
+                  echo 'ERROR: Backend health check failed after all retries'
+                  exit 1
+                fi
+                sleep 10
+              fi
+            done
+            
+            # Check database connectivity
+            if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:8081/health/db > /dev/null; then
+              echo 'Database connectivity check: PASS'
+            else
+              echo 'ERROR: Database connectivity check failed'
+              exit 1
+            fi
+            
+            # Check Redis connectivity
+            if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:8081/health/redis > /dev/null; then
+              echo 'Redis connectivity check: PASS'
+            else
+              echo 'ERROR: Redis connectivity check failed'
+              exit 1
+            fi
+            
+            echo 'All health checks passed!'
+          "
+
+      - name: Switch to green version
+        if: success()
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Stop blue version if running
+            if [ -f /var/run/bugrelay-backend.pid ]; then
+              sudo kill \$(cat /var/run/bugrelay-backend.pid) || true
+              sudo rm -f /var/run/bugrelay-backend.pid
+            fi
+            
+            # Move current blue to old
+            if [ -d ${{ env.DEPLOYMENT_PATH }}/backend ]; then
+              sudo mv ${{ env.DEPLOYMENT_PATH }}/backend ${{ env.DEPLOYMENT_PATH }}/backend-old
+            fi
+            
+            # Move green to blue (active)
+            sudo mv ${{ env.DEPLOYMENT_PATH }}/backend-green ${{ env.DEPLOYMENT_PATH }}/backend
+            
+            # Update nginx configuration to point to port 8080
+            cd ${{ env.DEPLOYMENT_PATH }}/backend
+            export PORT=8080
+            sudo -E nohup ./bugrelay-backend > /var/log/bugrelay-backend.log 2>&1 &
+            echo \$! | sudo tee /var/run/bugrelay-backend.pid
+            
+            # Clean up old version
+            sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/backend-old || true
+            
+            # Update nginx if needed (reload configuration)
+            sudo nginx -t && sudo systemctl reload nginx || true
+            
+            echo 'Blue-green deployment completed successfully'
+          "
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, health-check]
+    if: failure()
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rollback to previous version
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Starting rollback process...'
+            
+            # Stop green version if running
+            if [ -f /var/run/bugrelay-backend-green.pid ]; then
+              sudo kill \$(cat /var/run/bugrelay-backend-green.pid) || true
+              sudo rm -f /var/run/bugrelay-backend-green.pid
+            fi
+            
+            # Remove failed green deployment
+            sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/backend-green || true
+            
+            # Find latest backup
+            LATEST_BACKUP=\$(sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/backend-backup-* 2>/dev/null | head -n 1)
+            
+            if [ -n \"\$LATEST_BACKUP\" ]; then
+              echo \"Restoring from backup: \$LATEST_BACKUP\"
+              
+              # Stop current backend if running
+              if [ -f /var/run/bugrelay-backend.pid ]; then
+                sudo kill \$(cat /var/run/bugrelay-backend.pid) || true
+                sudo rm -f /var/run/bugrelay-backend.pid
+              fi
+              
+              # Restore from backup
+              sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/backend || true
+              sudo cp -r \"\$LATEST_BACKUP\" ${{ env.DEPLOYMENT_PATH }}/backend
+              sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DEPLOYMENT_PATH }}/backend
+              
+              # Start restored version
+              cd ${{ env.DEPLOYMENT_PATH }}/backend
+              export PORT=8080
+              sudo -E nohup ./bugrelay-backend > /var/log/bugrelay-backend.log 2>&1 &
+              echo \$! | sudo tee /var/run/bugrelay-backend.pid
+              
+              # Wait and verify rollback
+              sleep 10
+              if curl -f -s --max-time 30 http://localhost:8080/health > /dev/null; then
+                echo 'Rollback successful - service is healthy'
+              else
+                echo 'WARNING: Rollback completed but health check failed'
+              fi
+            else
+              echo 'ERROR: No backup found for rollback'
+              exit 1
+            fi
+          "
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [test, build, deploy, health-check, rollback]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.health-check.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=Backend deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.rollback.result }}" == "success" ]]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+            echo "message=Backend deployment failed and was rolled back" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "message=Backend deployment failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "Backend Deployment Notification",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.status.outputs.status }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "${{ github.sha }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Deployer",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.event.inputs.branch || github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Environment",
+                      "value": "${{ github.event.inputs.environment || 'production' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Timestamp",
+                      "value": "${{ env.DEPLOYMENT_TIMESTAMP || github.event.head_commit.timestamp }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Workflow",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": true
+                    }
+                  ],
+                  "text": "${{ steps.status.outputs.message }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

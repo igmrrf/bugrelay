@@ -29,7 +29,10 @@ func main() {
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		fmt.Println("No .env file found, using system environment variables")
+		// Try loading from parent directory (useful when running from backend subdirectory)
+		if err := godotenv.Load("../.env"); err != nil {
+			fmt.Println("No .env file found, using system environment variables")
+		}
 	}
 
 	// Initialize configuration

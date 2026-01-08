@@ -10,16 +10,16 @@ BugRelay uses GitHub Actions for continuous integration and deployment. Each com
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    GitHub Repository                         │
-│                                                              │
+│                    GitHub Repository                        │
+│                                                             │
 │  Push to main → Workflow Triggered → Jobs Execute           │
-│                                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ Backend  │  │ Frontend │  │Monitoring│  │   Docs   │   │
-│  │ Workflow │  │ Workflow │  │ Workflow │  │ Workflow │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │              │              │          │
-└───────┼─────────────┼──────────────┼──────────────┼──────────┘
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
+│  │ Backend  │  │ Frontend │  │Monitoring│  │   Docs   │     │
+│  │ Workflow │  │ Workflow │  │ Workflow │  │ Workflow │     │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
+│       │             │              │              │         │
+└───────┼─────────────┼──────────────┼──────────────┼─────────┘
         │             │              │              │
         └─────────────┴──────────────┴──────────────┘
                       │

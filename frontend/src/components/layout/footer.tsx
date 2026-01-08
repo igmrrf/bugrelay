@@ -3,57 +3,26 @@ import Link from "next/link";
 import { Bug } from "lucide-react";
 
 export const Footer: React.FC = () => {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="border-t bg-background">
-      <div className="container py-8 md:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="container py-12 md:py-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
           {/* Brand Section */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Bug className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">BugRelay</span>
-            </div>
+          <div className="col-span-2 md:col-span-1 space-y-4">
+            <Link href="/" className="flex items-center gap-2 w-fit">
+              <Bug className="h-5 w-5" />
+              <span className="font-semibold">BugRelay</span>
+            </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
-              A public, user-driven bug tracking hub that connects users and
-              companies to improve software quality together.
+              Public bug tracking platform connecting users and companies.
             </p>
-            <div className="flex space-x-4">
-              <Link
-                href="https://github.com"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg
-                  role="img"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <title>GitHub</title>
-                  <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                </svg>
-              </Link>
-              <Link
-                href="https://twitter.com"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg
-                  role="img"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <title>X</title>
-                  <path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z" />
-                </svg>
-              </Link>
-            </div>
           </div>
 
-          {/* Product Links */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Product</h3>
+          {/* Product */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Product</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
@@ -84,22 +53,22 @@ export const Footer: React.FC = () => {
                   href="/api-docs"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  API Documentation
+                  API
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Company Links */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Company</h3>
+          {/* Company */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/about"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  About Us
+                  About
                 </Link>
               </li>
               <li>
@@ -129,16 +98,16 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Legal Links */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Legal</h3>
+          {/* Legal */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/privacy"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Privacy Policy
+                  Privacy
                 </Link>
               </li>
               <li>
@@ -146,7 +115,7 @@ export const Footer: React.FC = () => {
                   href="/terms"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Terms of Service
+                  Terms
                 </Link>
               </li>
               <li>
@@ -154,7 +123,7 @@ export const Footer: React.FC = () => {
                   href="/guidelines"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Community Guidelines
+                  Guidelines
                 </Link>
               </li>
               <li>
@@ -169,14 +138,48 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-8 pt-8 border-t">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-sm text-muted-foreground">
-              © 2025 BugRelay. All rights reserved.
-            </p>
-            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-              <span>Made with ❤ for the community</span>
-            </div>
+        {/* Bottom Bar */}
+        <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            © {currentYear} BugRelay. All rights reserved.
+          </p>
+          <div className="flex items-center gap-6">
+            <Link
+              href="https://github.com"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </Link>
+            <Link
+              href="https://twitter.com"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Twitter"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </Link>
           </div>
         </div>
       </div>

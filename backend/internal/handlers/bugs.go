@@ -1759,3 +1759,1426 @@ func (h *BugHandler) AddCompanyResponse(c *gin.Context) {
 		"comment": comment,
 	})
 }
+
+// GetComments retrieves comments for a bug with pagination
+func (h *BugHandler) GetComments(c *gin.Context) {
+	bugID := c.Param("id")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Parse pagination parameters
+	page := 1
+	if pageParam := c.DefaultQuery("page", "1"); pageParam != "" {
+		fmt.Sscanf(pageParam, "%d", &page)
+		if page < 1 {
+			page = 1
+		}
+	}
+
+	limit := 20
+	if limitParam := c.DefaultQuery("limit", "20"); limitParam != "" {
+		fmt.Sscanf(limitParam, "%d", &limit)
+		if limit < 1 {
+			limit = 20
+		}
+		if limit > 100 {
+			limit = 100
+		}
+	}
+
+	// Verify bug exists
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get total count
+	var total int64
+	if err := h.db.Model(&models.Comment{}).Where("bug_id = ?", bugUUID).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COUNT_FAILED",
+				"message":   "Failed to count comments",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get comments with pagination
+	var comments []models.Comment
+	offset := (page - 1) * limit
+	if err := h.db.Where("bug_id = ?", bugUUID).
+		Preload("User").
+		Order("created_at ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&comments).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve comments",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Calculate pagination metadata
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+	hasNextPage := page < totalPages
+	hasPrevPage := page > 1
+
+	c.JSON(http.StatusOK, gin.H{
+		"comments": comments,
+		"pagination": gin.H{
+			"page":          page,
+			"limit":         limit,
+			"total":         total,
+			"total_pages":   totalPages,
+			"has_next_page": hasNextPage,
+			"has_prev_page": hasPrevPage,
+		},
+	})
+}
+
+// ReplyToCommentRequest represents the request payload for replying to a comment
+type ReplyToCommentRequest struct {
+	Content string `json:"content" binding:"required,min=1,max=2000"`
+}
+
+// ReplyToComment creates a reply to a specific comment
+func (h *BugHandler) ReplyToComment(c *gin.Context) {
+	bugID := c.Param("id")
+	commentID := c.Param("commentId")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	commentUUID, err := uuid.Parse(commentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid comment ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	var req ReplyToCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify bug exists
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify parent comment exists
+	var parentComment models.Comment
+	if err := h.db.Where("id = ? AND bug_id = ?", commentUUID, bugUUID).First(&parentComment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "COMMENT_NOT_FOUND",
+					"message":   "Parent comment not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve parent comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Check if this is a company response
+	isCompanyResponse := false
+	if bug.AssignedCompanyID != nil {
+		var membership models.CompanyMember
+		err := h.db.Where("company_id = ? AND user_id = ?", *bug.AssignedCompanyID, userUUID).
+			First(&membership).Error
+		if err == nil {
+			isCompanyResponse = true
+		}
+	}
+
+	// Sanitize content
+	sanitizedContent, contentValid := utils.ValidateString(req.Content, 1, 2000)
+	if !contentValid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_CONTENT",
+				"message":   "Comment content must be between 1 and 2000 characters",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Start transaction
+	tx := h.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Create reply comment
+	reply := models.Comment{
+		BugID:             bugUUID,
+		UserID:            userUUID,
+		Content:           sanitizedContent,
+		IsCompanyResponse: isCompanyResponse,
+	}
+
+	if err := tx.Create(&reply).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "REPLY_CREATE_FAILED",
+				"message":   "Failed to create reply",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Increment comment count
+	if err := tx.Model(&bug).Update("comment_count", gorm.Expr("comment_count + 1")).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COUNT_UPDATE_FAILED",
+				"message":   "Failed to update comment count",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Update user's last active timestamp
+	if err := tx.Model(&models.User{}).Where("id = ?", userUUID).Update("last_active_at", time.Now()).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "ACTIVITY_UPDATE_FAILED",
+				"message":   "Failed to update user activity",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COMMIT_FAILED",
+				"message":   "Failed to save reply",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Load the created reply with user info
+	var createdReply models.Comment
+	if err := h.db.Preload("User").First(&createdReply, reply.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "LOAD_FAILED",
+				"message":   "Reply created but failed to load details",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Reply created successfully",
+		"comment": createdReply,
+	})
+}
+
+// UpdateCommentRequest represents the request payload for updating a comment
+type UpdateCommentRequest struct {
+	Content string `json:"content" binding:"required,min=1,max=2000"`
+}
+
+// UpdateComment updates an existing comment
+func (h *BugHandler) UpdateComment(c *gin.Context) {
+	bugID := c.Param("id")
+	commentID := c.Param("commentId")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	commentUUID, err := uuid.Parse(commentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid comment ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	var req UpdateCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify comment exists and belongs to the bug
+	var comment models.Comment
+	if err := h.db.Where("id = ? AND bug_id = ?", commentUUID, bugUUID).First(&comment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "COMMENT_NOT_FOUND",
+					"message":   "Comment not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify user owns the comment
+	if comment.UserID != userUUID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": gin.H{
+				"code":      "PERMISSION_DENIED",
+				"message":   "You can only edit your own comments",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Sanitize content
+	sanitizedContent, contentValid := utils.ValidateString(req.Content, 1, 2000)
+	if !contentValid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_CONTENT",
+				"message":   "Comment content must be between 1 and 2000 characters",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Update comment
+	comment.Content = sanitizedContent
+	if err := h.db.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "UPDATE_FAILED",
+				"message":   "Failed to update comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Load the updated comment with user info
+	var updatedComment models.Comment
+	if err := h.db.Preload("User").First(&updatedComment, comment.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "LOAD_FAILED",
+				"message":   "Comment updated but failed to load details",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Comment updated successfully",
+		"comment": updatedComment,
+	})
+}
+
+// DeleteComment soft-deletes a comment
+func (h *BugHandler) DeleteComment(c *gin.Context) {
+	bugID := c.Param("id")
+	commentID := c.Param("commentId")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	commentUUID, err := uuid.Parse(commentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid comment ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Check if user is admin
+	isAdmin := false
+	if role, exists := c.Get("user_role"); exists {
+		if roleStr, ok := role.(string); ok && roleStr == "admin" {
+			isAdmin = true
+		}
+	}
+
+	// Verify comment exists and belongs to the bug
+	var comment models.Comment
+	if err := h.db.Where("id = ? AND bug_id = ?", commentUUID, bugUUID).First(&comment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "COMMENT_NOT_FOUND",
+					"message":   "Comment not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify user owns the comment or is admin
+	if comment.UserID != userUUID && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": gin.H{
+				"code":      "PERMISSION_DENIED",
+				"message":   "You can only delete your own comments",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Start transaction
+	tx := h.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete comment (hard delete for now, can be changed to soft delete)
+	if err := tx.Delete(&comment).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "DELETE_FAILED",
+				"message":   "Failed to delete comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Decrement comment count
+	if err := tx.Model(&models.BugReport{}).Where("id = ?", bugUUID).
+		Update("comment_count", gorm.Expr("GREATEST(comment_count - 1, 0)")).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COUNT_UPDATE_FAILED",
+				"message":   "Failed to update comment count",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COMMIT_FAILED",
+				"message":   "Failed to delete comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Comment deleted successfully",
+	})
+}
+
+// FlagBug flags a bug for moderation (using FlagBugRequest from admin.go)
+func (h *BugHandler) FlagBug(c *gin.Context) {
+	bugID := c.Param("id")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	var req FlagBugRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID (optional - can flag anonymously)
+	var userUUID *uuid.UUID
+	if userIDStr, exists := middleware.GetCurrentUserID(c); exists {
+		parsed, err := uuid.Parse(userIDStr)
+		if err == nil {
+			userUUID = &parsed
+		}
+	}
+
+	// Verify bug exists
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Sanitize reason
+	sanitizedReason, reasonValid := utils.ValidateString(req.Reason, 10, 500)
+	if !reasonValid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_REASON",
+				"message":   "Flag reason must be between 10 and 500 characters",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Create audit log for the flag (only if user is authenticated)
+	if userUUID != nil {
+		auditLog := models.AuditLog{
+			Action:     "flag_bug",
+			Resource:   "bug_report",
+			ResourceID: &bugUUID,
+			Details:    fmt.Sprintf("Bug flagged for moderation. Reason: %s", sanitizedReason),
+			UserID:     *userUUID,
+		}
+
+		if err := h.db.Create(&auditLog).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"code":      "FLAG_FAILED",
+					"message":   "Failed to flag bug report",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bug flagged successfully for moderation",
+	})
+}
+
+// FlagCommentRequest represents the request payload for flagging a comment
+type FlagCommentRequest struct {
+	Reason string `json:"reason" binding:"required,min=10,max=500"`
+}
+
+// FlagComment flags a comment for moderation
+func (h *BugHandler) FlagComment(c *gin.Context) {
+	bugID := c.Param("id")
+	commentID := c.Param("commentId")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	commentUUID, err := uuid.Parse(commentID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid comment ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	var req FlagCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID (optional)
+	var userUUID *uuid.UUID
+	if userIDStr, exists := middleware.GetCurrentUserID(c); exists {
+		parsed, err := uuid.Parse(userIDStr)
+		if err == nil {
+			userUUID = &parsed
+		}
+	}
+
+	// Verify comment exists and belongs to the bug
+	var comment models.Comment
+	if err := h.db.Where("id = ? AND bug_id = ?", commentUUID, bugUUID).First(&comment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "COMMENT_NOT_FOUND",
+					"message":   "Comment not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve comment",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Sanitize reason
+	sanitizedReason, reasonValid := utils.ValidateString(req.Reason, 10, 500)
+	if !reasonValid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_REASON",
+				"message":   "Flag reason must be between 10 and 500 characters",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Create audit log for the flag (only if user is authenticated)
+	if userUUID != nil {
+		auditLog := models.AuditLog{
+			Action:     "flag_comment",
+			Resource:   "comment",
+			ResourceID: &commentUUID,
+			Details:    fmt.Sprintf("Comment flagged for moderation. Reason: %s", sanitizedReason),
+			UserID:     *userUUID,
+		}
+
+		if err := h.db.Create(&auditLog).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"code":      "FLAG_FAILED",
+					"message":   "Failed to flag comment",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Comment flagged successfully for moderation",
+	})
+}
+
+// SearchDuplicatesRequest represents the request for duplicate search
+type SearchDuplicatesRequest struct {
+	Title       string `json:"title" binding:"required,min=5"`
+	Description string `json:"description"`
+}
+
+// SearchDuplicates performs semantic search for duplicate bugs
+func (h *BugHandler) SearchDuplicates(c *gin.Context) {
+	var req SearchDuplicatesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Sanitize inputs
+	sanitizedTitle, titleValid := utils.ValidateString(req.Title, 5, 255)
+	if !titleValid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_TITLE",
+				"message":   "Title must be between 5 and 255 characters",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Build search query using PostgreSQL full-text search
+	searchQuery := strings.ToLower(sanitizedTitle)
+
+	// Search for similar bugs
+	var bugs []models.BugReport
+	query := h.db.Where("LOWER(title) LIKE ?", "%"+searchQuery+"%")
+
+	// If description provided, also search in description
+	if req.Description != "" {
+		sanitizedDesc, _ := utils.ValidateString(req.Description, 0, 5000)
+		if sanitizedDesc != "" {
+			query = query.Or("LOWER(description) LIKE ?", "%"+strings.ToLower(sanitizedDesc)+"%")
+		}
+	}
+
+	if err := query.
+		Preload("Application").
+		Preload("Reporter").
+		Order("created_at DESC").
+		Limit(10).
+		Find(&bugs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "SEARCH_FAILED",
+				"message":   "Failed to search for duplicates",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Calculate match scores (simple implementation)
+	type DuplicateResult struct {
+		Bug        models.BugReport `json:"bug"`
+		MatchScore float64          `json:"match_score"`
+	}
+
+	results := make([]DuplicateResult, len(bugs))
+	for i, bug := range bugs {
+		// Simple scoring based on title similarity
+		score := 0.5 // Base score
+		if strings.Contains(strings.ToLower(bug.Title), searchQuery) {
+			score += 0.3
+		}
+		if req.Description != "" && strings.Contains(strings.ToLower(bug.Description), strings.ToLower(req.Description)) {
+			score += 0.2
+		}
+		results[i] = DuplicateResult{
+			Bug:        bug,
+			MatchScore: score,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"results": results,
+		"count":   len(results),
+	})
+}
+
+// UnvoteBug removes a vote from a bug report
+func (h *BugHandler) UnvoteBug(c *gin.Context) {
+	bugID := c.Param("id")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify bug exists
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Check if vote exists
+	var existingVote models.BugVote
+	err = h.db.Where("bug_id = ? AND user_id = ?", bugUUID, userUUID).First(&existingVote).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "VOTE_NOT_FOUND",
+					"message":   "You have not voted on this bug",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to check vote status",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Start transaction
+	tx := h.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete the vote
+	if err := tx.Delete(&existingVote).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "DELETE_FAILED",
+				"message":   "Failed to remove vote",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Decrement vote count
+	if err := tx.Model(&bug).Update("vote_count", gorm.Expr("GREATEST(vote_count - 1, 0)")).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COUNT_UPDATE_FAILED",
+				"message":   "Failed to update vote count",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Update user's last active timestamp
+	if err := tx.Model(&models.User{}).Where("id = ?", userUUID).Update("last_active_at", time.Now()).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "ACTIVITY_UPDATE_FAILED",
+				"message":   "Failed to update user activity",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "COMMIT_FAILED",
+				"message":   "Failed to remove vote",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Invalidate cache
+	cacheKey := fmt.Sprintf("bug:%s", bugID)
+	h.cache.Delete(c.Request.Context(), cacheKey)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Vote removed successfully",
+		"vote_count": bug.VoteCount - 1,
+	})
+}
+
+// UpdateBugRequest represents the request payload for updating a bug
+type UpdateBugRequest struct {
+	Title       *string  `json:"title,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	Priority    *string  `json:"priority,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+}
+
+// UpdateBug updates bug details (not just status)
+func (h *BugHandler) UpdateBug(c *gin.Context) {
+	bugID := c.Param("id")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	var req UpdateBugRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "VALIDATION_ERROR",
+				"message":   "Invalid request data",
+				"details":   err.Error(),
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Check if user is admin
+	isAdmin := false
+	if role, exists := c.Get("user_role"); exists {
+		if roleStr, ok := role.(string); ok && roleStr == "admin" {
+			isAdmin = true
+		}
+	}
+
+	// Retrieve the bug
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify user owns the bug or is admin
+	if bug.ReporterID == nil || *bug.ReporterID != userUUID {
+		if !isAdmin {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": gin.H{
+					"code":      "PERMISSION_DENIED",
+					"message":   "You can only edit your own bug reports",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+	}
+
+	// Update fields
+	updates := make(map[string]interface{})
+
+	if req.Title != nil {
+		sanitizedTitle, titleValid := utils.ValidateString(*req.Title, 5, 255)
+		if !titleValid {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{
+					"code":      "INVALID_TITLE",
+					"message":   "Title must be between 5 and 255 characters",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+		updates["title"] = sanitizedTitle
+	}
+
+	if req.Description != nil {
+		sanitizedDesc, descValid := utils.ValidateString(*req.Description, 10, 10000)
+		if !descValid {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{
+					"code":      "INVALID_DESCRIPTION",
+					"message":   "Description must be between 10 and 10000 characters",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+		updates["description"] = sanitizedDesc
+	}
+
+	if req.Priority != nil {
+		if !models.IsValidPriority(*req.Priority) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{
+					"code":      "INVALID_PRIORITY",
+					"message":   "Invalid priority value",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+		updates["priority"] = *req.Priority
+	}
+
+	if req.Tags != nil {
+		updates["tags"] = pq.StringArray(req.Tags)
+	}
+
+	// Perform update
+	if len(updates) > 0 {
+		if err := h.db.Model(&bug).Updates(updates).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"code":      "UPDATE_FAILED",
+					"message":   "Failed to update bug report",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+	}
+
+	// Invalidate cache
+	cacheKey := fmt.Sprintf("bug:%s", bugID)
+	h.cache.Delete(c.Request.Context(), cacheKey)
+
+	// Reload the updated bug
+	var updatedBug models.BugReport
+	if err := h.db.Preload("Application").
+		Preload("Reporter").
+		Preload("AssignedCompany").
+		First(&updatedBug, bugUUID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "LOAD_FAILED",
+				"message":   "Bug updated but failed to load details",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bug report updated successfully",
+		"bug":     updatedBug,
+	})
+}
+
+// DeleteBug soft-deletes a bug report
+func (h *BugHandler) DeleteBug(c *gin.Context) {
+	bugID := c.Param("id")
+
+	bugUUID, err := uuid.Parse(bugID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_ID",
+				"message":   "Invalid bug ID format",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Get current user ID
+	userIDStr, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":      "AUTH_REQUIRED",
+				"message":   "Authentication required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "INVALID_USER",
+				"message":   "Invalid user ID",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Check if user is admin
+	isAdmin := false
+	if role, exists := c.Get("user_role"); exists {
+		if roleStr, ok := role.(string); ok && roleStr == "admin" {
+			isAdmin = true
+		}
+	}
+
+	// Retrieve the bug
+	var bug models.BugReport
+	if err := h.db.First(&bug, bugUUID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": gin.H{
+					"code":      "BUG_NOT_FOUND",
+					"message":   "Bug report not found",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "QUERY_FAILED",
+				"message":   "Failed to retrieve bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Verify user owns the bug or is admin
+	if bug.ReporterID == nil || *bug.ReporterID != userUUID {
+		if !isAdmin {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": gin.H{
+					"code":      "PERMISSION_DENIED",
+					"message":   "You can only delete your own bug reports",
+					"timestamp": time.Now().UTC(),
+				},
+			})
+			return
+		}
+	}
+
+	// Soft delete the bug
+	if err := h.db.Delete(&bug).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "DELETE_FAILED",
+				"message":   "Failed to delete bug report",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	// Invalidate cache
+	cacheKey := fmt.Sprintf("bug:%s", bugID)
+	h.cache.Delete(c.Request.Context(), cacheKey)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bug report deleted successfully",
+	})
+}

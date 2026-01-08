@@ -19,7 +19,7 @@ export interface AuthResponse {
     user: User;
     expires_in: number;
     refresh_token: string;
-    accessh_token: string;
+    access_token: string;
   };
   message: string;
 }

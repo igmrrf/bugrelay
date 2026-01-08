@@ -1,0 +1,686 @@
+name: Documentation Site Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+  DEPLOYMENT_USER: ${{ secrets.DO_USER }}
+  DEPLOYMENT_HOST: ${{ secrets.DO_HOST }}
+  DEPLOYMENT_PATH: /opt/bugrelay
+  DOCS_PATH: /opt/bugrelay/docs
+  HEALTH_CHECK_TIMEOUT: 60
+  HEALTH_CHECK_RETRIES: 5
+
+jobs:
+  build:
+    name: Build Documentation Site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docs
+        run: npm ci
+
+      - name: Validate documentation before build
+        working-directory: docs
+        run: |
+          # Validate OpenAPI specification
+          npm run validate:openapi || echo "OpenAPI validation failed, continuing..."
+          
+          # Validate JSON schemas
+          npm run validate:schemas || echo "Schema validation failed, continuing..."
+          
+          # Check for broken links
+          npm run validate:links || echo "Link validation failed, continuing..."
+
+      - name: Build VitePress documentation site
+        working-directory: docs
+        env:
+          NODE_ENV: production
+        run: |
+          # Build the documentation site with optimizations
+          npm run build
+          
+          # Verify build output exists
+          if [ ! -d ".vitepress/dist" ]; then
+            echo "ERROR: Build output directory not found"
+            exit 1
+          fi
+          
+          echo "Documentation build completed successfully"
+
+      - name: Optimize build output
+        working-directory: docs
+        run: |
+          cd .vitepress/dist
+          
+          # Create gzipped versions of large files for better compression
+          find . -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.json" \) -size +1k -exec gzip -k {} \;
+          
+          # Generate file manifest for deployment verification
+          find . -type f -exec sha256sum {} \; > ../../../docs-manifest.txt
+          
+          echo "Build optimization completed"
+
+      - name: Create deployment package
+        working-directory: docs
+        run: |
+          mkdir -p deployment-package
+          
+          # Copy built documentation site
+          cp -r .vitepress/dist/* deployment-package/
+          
+          # Add deployment metadata
+          echo "${{ github.sha }}" > deployment-package/VERSION
+          echo "${{ github.actor }}" > deployment-package/DEPLOYER
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > deployment-package/BUILD_TIME
+          
+          # Create nginx configuration for docs site
+          cat > deployment-package/nginx-docs.conf << 'EOF'
+          server {
+              listen 80;
+              server_name docs.${{ env.DEPLOYMENT_HOST }};
+              
+              # Redirect HTTP to HTTPS
+              return 301 https://$server_name$request_uri;
+          }
+          
+          server {
+              listen 443 ssl http2;
+              server_name docs.${{ env.DEPLOYMENT_HOST }};
+              
+              # SSL configuration (assuming certificates are set up)
+              ssl_certificate /etc/ssl/certs/docs-bugrelay.crt;
+              ssl_certificate_key /etc/ssl/private/docs-bugrelay.key;
+              
+              # Document root
+              root /opt/bugrelay/docs/current;
+              index index.html;
+              
+              # Security headers
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+              
+              # Caching for static assets
+              location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
+                  add_header Vary "Accept-Encoding";
+                  
+                  # Serve gzipped versions if available
+                  gzip_static on;
+              }
+              
+              # HTML files with shorter cache
+              location ~* \.html$ {
+                  expires 1h;
+                  add_header Cache-Control "public, must-revalidate";
+                  add_header Vary "Accept-Encoding";
+                  
+                  # Serve gzipped versions if available
+                  gzip_static on;
+              }
+              
+              # API documentation with no cache
+              location /api/ {
+                  expires -1;
+                  add_header Cache-Control "no-cache, no-store, must-revalidate";
+              }
+              
+              # Default location
+              location / {
+                  try_files $uri $uri/ $uri.html /index.html;
+                  
+                  # Enable gzip compression
+                  gzip_static on;
+              }
+              
+              # Health check endpoint
+              location /health {
+                  access_log off;
+                  return 200 "healthy\n";
+                  add_header Content-Type text/plain;
+              }
+              
+              # Robots.txt
+              location = /robots.txt {
+                  allow all;
+                  log_not_found off;
+                  access_log off;
+              }
+              
+              # Favicon
+              location = /favicon.ico {
+                  log_not_found off;
+                  access_log off;
+              }
+          }
+          EOF
+          
+          # Create tarball
+          tar -czf bugrelay-docs-${{ github.sha }}.tar.gz deployment-package/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs-build
+          path: docs/bugrelay-docs-${{ github.sha }}.tar.gz
+          retention-days: 30
+
+      - name: Upload build manifest
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs-manifest
+          path: docs/docs-manifest.txt
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-info
+          path: |
+            docs/deployment-package/VERSION
+            docs/deployment-package/DEPLOYER
+            docs/deployment-package/BUILD_TIME
+  deploy:
+    name: Deploy Documentation Site
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: docs-build
+          path: ./artifacts
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup of current documentation
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/backups
+            if [ -d ${{ env.DOCS_PATH }}/current ]; then
+              BACKUP_NAME=docs-backup-$(date +%Y%m%d-%H%M%S)
+              sudo cp -r ${{ env.DOCS_PATH }}/current ${{ env.DEPLOYMENT_PATH }}/backups/\$BACKUP_NAME
+              echo \"Documentation backup created: \$BACKUP_NAME\"
+              # Keep only last 5 backups
+              sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/docs-backup-* | tail -n +6 | sudo xargs rm -rf || true
+            fi
+          "
+
+      - name: Deploy new documentation build
+        run: |
+          # Transfer new documentation build
+          scp ./artifacts/bugrelay-docs-${{ github.sha }}.tar.gz ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }}:/tmp/
+
+          # Deploy documentation
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Create docs directory structure
+            sudo mkdir -p ${{ env.DOCS_PATH }}/{new,current}
+            
+            # Extract new documentation build
+            cd /tmp
+            tar -xzf bugrelay-docs-${{ github.sha }}.tar.gz
+            
+            # Copy to new deployment directory
+            sudo cp -r deployment-package/* ${{ env.DOCS_PATH }}/new/
+            sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DOCS_PATH }}/new
+            
+            # Set proper permissions for web server
+            sudo find ${{ env.DOCS_PATH }}/new -type f -exec chmod 644 {} \;
+            sudo find ${{ env.DOCS_PATH }}/new -type d -exec chmod 755 {} \;
+            
+            echo 'Documentation files deployed to staging directory'
+          "
+
+      - name: Configure Nginx for docs site
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Copy nginx configuration
+            sudo cp ${{ env.DOCS_PATH }}/new/nginx-docs.conf /etc/nginx/sites-available/docs-bugrelay
+            
+            # Test nginx configuration
+            sudo nginx -t -c /dev/null -g 'include /etc/nginx/sites-available/docs-bugrelay;' || {
+              echo 'ERROR: Nginx configuration test failed'
+              exit 1
+            }
+            
+            echo 'Nginx configuration validated successfully'
+          "
+
+      - name: Set up SSL and caching headers
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Check if SSL certificates exist, create self-signed if not (for testing)
+            if [ ! -f /etc/ssl/certs/docs-bugrelay.crt ]; then
+              echo 'Creating self-signed SSL certificate for docs site...'
+              sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout /etc/ssl/private/docs-bugrelay.key \
+                -out /etc/ssl/certs/docs-bugrelay.crt \
+                -subj '/C=US/ST=State/L=City/O=Organization/CN=docs.${{ env.DEPLOYMENT_HOST }}'
+              
+              sudo chmod 600 /etc/ssl/private/docs-bugrelay.key
+              sudo chmod 644 /etc/ssl/certs/docs-bugrelay.crt
+            fi
+            
+            # Enable the docs site
+            sudo ln -sf /etc/nginx/sites-available/docs-bugrelay /etc/nginx/sites-enabled/docs-bugrelay
+            
+            # Test complete nginx configuration
+            sudo nginx -t
+            
+            echo 'SSL and nginx configuration completed'
+          "
+
+      - name: Store deployment metadata
+        run: |
+          echo "DEPLOYMENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "DEPLOYMENT_COMMIT=${{ github.sha }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_DEPLOYER=${{ github.actor }}" >> $GITHUB_ENV
+  verify:
+    name: Verify Documentation Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run documentation site verification checks
+        id: verify_docs
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Running documentation site verification checks...'
+            
+            # Check if documentation files exist
+            if [ ! -d ${{ env.DOCS_PATH }}/new ]; then
+              echo 'ERROR: Documentation deployment directory not found'
+              exit 1
+            fi
+            
+            # Check if index.html exists
+            if [ ! -f ${{ env.DOCS_PATH }}/new/index.html ]; then
+              echo 'ERROR: Documentation index.html not found'
+              exit 1
+            fi
+            
+            # Temporarily switch to new version for testing
+            if [ -d ${{ env.DOCS_PATH }}/current ]; then
+              sudo mv ${{ env.DOCS_PATH }}/current ${{ env.DOCS_PATH }}/old
+            fi
+            sudo mv ${{ env.DOCS_PATH }}/new ${{ env.DOCS_PATH }}/current
+            
+            # Reload nginx to pick up new documentation
+            sudo systemctl reload nginx
+            
+            # Wait for nginx to reload
+            sleep 5
+            
+            echo 'Documentation files verified and nginx reloaded'
+          "
+
+      - name: Check documentation site accessibility
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Checking documentation site accessibility...'
+            
+            # Check HTTP accessibility (should redirect to HTTPS)
+            for i in \$(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+              HTTP_STATUS=\$(curl -s -o /dev/null -w '%{http_code}' --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://docs.${{ env.DEPLOYMENT_HOST }} || echo '000')
+              if [ \"\$HTTP_STATUS\" = '301' ] || [ \"\$HTTP_STATUS\" = '302' ]; then
+                echo 'HTTP redirect check: PASS (Status: '\$HTTP_STATUS')'
+                break
+              else
+                echo \"HTTP redirect check attempt \$i failed (Status: \$HTTP_STATUS)\"
+                if [ \$i -eq ${{ env.HEALTH_CHECK_RETRIES }} ]; then
+                  echo 'ERROR: HTTP redirect check failed after all retries'
+                  exit 1
+                fi
+                sleep 10
+              fi
+            done
+            
+            # Check HTTPS accessibility
+            for i in \$(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+              if curl -f -s -k --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} https://docs.${{ env.DEPLOYMENT_HOST }} > /dev/null; then
+                echo 'HTTPS accessibility check: PASS'
+                break
+              else
+                echo \"HTTPS accessibility check attempt \$i failed\"
+                if [ \$i -eq ${{ env.HEALTH_CHECK_RETRIES }} ]; then
+                  echo 'ERROR: HTTPS accessibility check failed after all retries'
+                  exit 1
+                fi
+                sleep 10
+              fi
+            done
+            
+            # Check if documentation returns valid HTML
+            RESPONSE=\$(curl -s -k --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} https://docs.${{ env.DEPLOYMENT_HOST }})
+            if echo \"\$RESPONSE\" | grep -q \"<html\"; then
+              echo 'HTML response check: PASS'
+            else
+              echo 'ERROR: Documentation site not returning valid HTML'
+              exit 1
+            fi
+            
+            echo 'Documentation site accessibility verified'
+          "
+
+      - name: Verify SSL certificate
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Verifying SSL certificate...'
+            
+            # Check SSL certificate validity
+            if openssl s_client -connect docs.${{ env.DEPLOYMENT_HOST }}:443 -servername docs.${{ env.DEPLOYMENT_HOST }} < /dev/null 2>/dev/null | openssl x509 -noout -dates; then
+              echo 'SSL certificate check: PASS'
+            else
+              echo 'WARNING: SSL certificate check failed (may be self-signed)'
+            fi
+            
+            # Check SSL connection
+            if echo | openssl s_client -connect docs.${{ env.DEPLOYMENT_HOST }}:443 -servername docs.${{ env.DEPLOYMENT_HOST }} 2>/dev/null | grep -q 'Verify return code: 0'; then
+              echo 'SSL connection verification: PASS'
+            else
+              echo 'WARNING: SSL connection verification failed (may be self-signed certificate)'
+            fi
+          "
+
+      - name: Verify caching headers
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Verifying caching headers...'
+            
+            # Check HTML caching headers
+            HTML_CACHE=\$(curl -s -I -k https://docs.${{ env.DEPLOYMENT_HOST }} | grep -i 'cache-control' || echo 'not found')
+            echo \"HTML Cache-Control: \$HTML_CACHE\"
+            
+            # Check static asset caching (if CSS files exist)
+            if find ${{ env.DOCS_PATH }}/current -name '*.css' -type f | head -1 | read CSS_FILE; then
+              CSS_PATH=\$(echo \"\$CSS_FILE\" | sed 's|${{ env.DOCS_PATH }}/current||')
+              STATIC_CACHE=\$(curl -s -I -k https://docs.${{ env.DEPLOYMENT_HOST }}\"\$CSS_PATH\" | grep -i 'cache-control' || echo 'not found')
+              echo \"Static Asset Cache-Control: \$STATIC_CACHE\"
+              
+              if echo \"\$STATIC_CACHE\" | grep -q '1y\|31536000'; then
+                echo 'Static asset caching check: PASS'
+              else
+                echo 'WARNING: Static asset caching may not be optimal'
+              fi
+            else
+              echo 'No CSS files found to test static asset caching'
+            fi
+            
+            # Check gzip compression
+            if curl -s -H 'Accept-Encoding: gzip' -k https://docs.${{ env.DEPLOYMENT_HOST }} | file - | grep -q 'gzip'; then
+              echo 'Gzip compression check: PASS'
+            else
+              echo 'WARNING: Gzip compression may not be enabled'
+            fi
+            
+            echo 'Caching headers verification completed'
+          "
+
+      - name: Verify documentation content
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Verifying documentation content...'
+            
+            # Check if API documentation is accessible
+            if curl -f -s -k --max-time 30 https://docs.${{ env.DEPLOYMENT_HOST }}/api/ > /dev/null; then
+              echo 'API documentation check: PASS'
+            else
+              echo 'WARNING: API documentation may not be accessible'
+            fi
+            
+            # Check if health endpoint works
+            if curl -f -s -k --max-time 30 https://docs.${{ env.DEPLOYMENT_HOST }}/health | grep -q 'healthy'; then
+              echo 'Health endpoint check: PASS'
+            else
+              echo 'WARNING: Health endpoint may not be working'
+            fi
+            
+            # Verify deployment metadata
+            if [ -f ${{ env.DOCS_PATH }}/current/VERSION ]; then
+              VERSION=\$(cat ${{ env.DOCS_PATH }}/current/VERSION)
+              echo \"Deployed version: \$VERSION\"
+              if [ \"\$VERSION\" = '${{ github.sha }}' ]; then
+                echo 'Version verification: PASS'
+              else
+                echo 'WARNING: Version mismatch'
+              fi
+            else
+              echo 'WARNING: Version file not found'
+            fi
+            
+            echo 'All documentation verification checks completed!'
+          "
+
+      - name: Finalize deployment
+        if: success()
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Clean up old version
+            sudo rm -rf ${{ env.DOCS_PATH }}/old || true
+            
+            echo 'Documentation deployment finalized successfully'
+          "
+  rollback:
+    name: Rollback Documentation on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: failure()
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rollback to previous documentation version
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Starting documentation rollback process...'
+            
+            # Remove failed new deployment
+            sudo rm -rf ${{ env.DOCS_PATH }}/new || true
+            
+            # Find latest backup
+            LATEST_BACKUP=\$(sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/docs-backup-* 2>/dev/null | head -n 1)
+            
+            if [ -n \"\$LATEST_BACKUP\" ]; then
+              echo \"Restoring from backup: \$LATEST_BACKUP\"
+              
+              # Remove current version
+              sudo rm -rf ${{ env.DOCS_PATH }}/current || true
+              
+              # Restore from backup
+              sudo cp -r \"\$LATEST_BACKUP\" ${{ env.DOCS_PATH }}/current
+              sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DOCS_PATH }}/current
+              
+              # Set proper permissions
+              sudo find ${{ env.DOCS_PATH }}/current -type f -exec chmod 644 {} \;
+              sudo find ${{ env.DOCS_PATH }}/current -type d -exec chmod 755 {} \;
+              
+              # Reload nginx
+              sudo systemctl reload nginx
+              
+              # Wait and verify rollback
+              sleep 10
+              if curl -f -s -k --max-time 30 https://docs.${{ env.DEPLOYMENT_HOST }} > /dev/null; then
+                echo 'Rollback successful - documentation site is accessible'
+              else
+                echo 'WARNING: Rollback completed but accessibility check failed'
+              fi
+            else
+              echo 'ERROR: No backup found for rollback'
+              echo 'Attempting to restore basic nginx configuration...'
+              
+              # Create minimal nginx config as fallback
+              sudo tee /etc/nginx/sites-available/docs-bugrelay > /dev/null << 'EOF'
+          server {
+              listen 80;
+              server_name docs.${{ env.DEPLOYMENT_HOST }};
+              return 301 https://$server_name$request_uri;
+          }
+          
+          server {
+              listen 443 ssl http2;
+              server_name docs.${{ env.DEPLOYMENT_HOST }};
+              
+              ssl_certificate /etc/ssl/certs/docs-bugrelay.crt;
+              ssl_certificate_key /etc/ssl/private/docs-bugrelay.key;
+              
+              root ${{ env.DOCS_PATH }}/current;
+              index index.html;
+              
+              location / {
+                  try_files \$uri \$uri/ \$uri.html /index.html;
+              }
+              
+              location /health {
+                  return 200 \"healthy\n\";
+                  add_header Content-Type text/plain;
+              }
+          }
+          EOF
+              
+              sudo nginx -t && sudo systemctl reload nginx || true
+              exit 1
+            fi
+          "
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [build, deploy, verify, rollback]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.verify.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=Documentation site deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.rollback.result }}" == "success" ]]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+            echo "message=Documentation site deployment failed and was rolled back" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "message=Documentation site deployment failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "Documentation Site Deployment Notification",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.status.outputs.status }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "${{ github.sha }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Deployer",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.event.inputs.branch || github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Environment",
+                      "value": "${{ github.event.inputs.environment || 'production' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Documentation URL",
+                      "value": "https://docs.${{ env.DEPLOYMENT_HOST }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Timestamp",
+                      "value": "${{ env.DEPLOYMENT_TIMESTAMP || github.event.head_commit.timestamp }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Workflow",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": true
+                    }
+                  ],
+                  "text": "${{ steps.status.outputs.message }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

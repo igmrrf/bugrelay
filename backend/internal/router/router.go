@@ -202,12 +202,24 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 			bugs.GET("/", bugHandler.ListBugs)
 			bugs.GET("/:id", bugHandler.GetBug)
 			bugs.POST("/", rateLimiter.BugSubmissionRateLimit(), authMiddleware.OptionalAuth(), bugHandler.CreateBug)
+			bugs.POST("/search/duplicates", bugHandler.SearchDuplicates)
+
+			// Comment endpoints
+			bugs.GET("/:id/comments", bugHandler.GetComments)
+			bugs.POST("/:id/comments", authMiddleware.RequireAuth(), bugHandler.CreateComment)
+			bugs.POST("/:id/comments/:commentId/replies", authMiddleware.RequireAuth(), bugHandler.ReplyToComment)
+			bugs.PATCH("/:id/comments/:commentId", authMiddleware.RequireAuth(), bugHandler.UpdateComment)
+			bugs.DELETE("/:id/comments/:commentId", authMiddleware.RequireAuth(), bugHandler.DeleteComment)
+			bugs.POST("/:id/comments/:commentId/flag", authMiddleware.OptionalAuth(), bugHandler.FlagComment)
 
 			// Protected bug endpoints
 			bugs.POST("/:id/vote", authMiddleware.RequireAuth(), bugHandler.VoteBug)
-			bugs.POST("/:id/comments", authMiddleware.RequireAuth(), bugHandler.CreateComment)
+			bugs.DELETE("/:id/vote", authMiddleware.RequireAuth(), bugHandler.UnvoteBug)
 			bugs.POST("/:id/attachments", authMiddleware.RequireAuth(), bugHandler.UploadBugAttachment)
+			bugs.POST("/:id/flag", authMiddleware.OptionalAuth(), bugHandler.FlagBug)
 			bugs.PATCH("/:id/status", authMiddleware.RequireAuth(), bugHandler.UpdateBugStatus)
+			bugs.PATCH("/:id", authMiddleware.RequireAuth(), bugHandler.UpdateBug)
+			bugs.DELETE("/:id", authMiddleware.RequireAuth(), bugHandler.DeleteBug)
 			bugs.POST("/:id/company-response", authMiddleware.RequireAuth(), bugHandler.AddCompanyResponse)
 		}
 
@@ -216,6 +228,7 @@ func Setup(db *gorm.DB, redisClient *redis.Client, cfg *config.Config) *gin.Engi
 		{
 			// Public company endpoints
 			companies.GET("/", companyHandler.ListCompanies)
+			companies.GET("/search", companyHandler.SearchCompanies)
 			companies.GET("/:id", companyHandler.GetCompany)
 
 			// Protected company endpoints

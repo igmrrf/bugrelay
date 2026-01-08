@@ -4,16 +4,16 @@ export {
   useLogin,
   useRegister,
   useLogout,
-  useRefreshToken
-} from './use-auth-queries'
+  useRefreshToken,
+} from "./use-auth-queries";
 
 // Auth initialization and protection hooks
 export {
   useAuthInit,
   usePermissions,
   useRequireAuth,
-  useRequireAdmin
-} from './use-auth-init'
+  useRequireAdmin,
+} from "./use-auth-init";
 
 // Bug hooks
 export {
@@ -24,8 +24,16 @@ export {
   useUpdateBug,
   useDeleteBug,
   useVoteBug,
-  useCommentOnBug
-} from './use-bug-queries'
+  useCommentOnBug,
+  useReplyToComment,
+  useUpdateComment,
+  useDeleteComment,
+  useFlagComment,
+  useSearchDuplicates,
+  useFlagBug,
+  useSearchCompanies,
+  useGetComments,
+} from "./use-bug-queries";
 
 // Company hooks
 export {
@@ -36,5 +44,5 @@ export {
   useAddCompanyMember,
   useRemoveCompanyMember,
   useUpdateMemberRole,
-  useCompanyMembers
-} from './use-company-queries'
+  useCompanyMembers,
+} from "./use-company-queries";

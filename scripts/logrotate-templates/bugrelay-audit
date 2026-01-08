@@ -1,0 +1,17 @@
+/var/log/bugrelay/audit/deployment-audit.log {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 deploy deploy
+    postrotate
+        # Send log rotation event to audit log
+        /opt/bugrelay/scripts/audit-log.sh config-change audit-log "log_rotated" production || true
+    endscript
+}
+
+/var/log/bugrelay/audit/deployment-audit.log.*.gz {
+    maxage 90
+}

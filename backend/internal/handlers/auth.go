@@ -73,12 +73,30 @@ type AuthResponse struct {
 
 // UserResponse represents the user data in responses
 type UserResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	AvatarURL   *string   `json:"avatarUrl,omitempty"`
-	IsAdmin     bool      `json:"isAdmin"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID                 uuid.UUID               `json:"id"`
+	Email              string                  `json:"email"`
+	DisplayName        string                  `json:"displayName"`
+	AvatarURL          *string                 `json:"avatarUrl,omitempty"`
+	IsAdmin            bool                    `json:"isAdmin"`
+	IsEmailVerified    bool                    `json:"isEmailVerified"`
+	AuthProvider       string                  `json:"authProvider"`
+	CompanyMemberships []CompanyMemberResponse `json:"companyMemberships"`
+	CreatedAt          time.Time               `json:"createdAt"`
+	LastActiveAt       time.Time               `json:"lastActiveAt"`
+}
+
+type CompanyMemberResponse struct {
+	ID        uuid.UUID              `json:"id"`
+	CompanyID uuid.UUID              `json:"companyId"`
+	Role      string                 `json:"role"`
+	Company   CompanySummaryResponse `json:"company"`
+}
+
+type CompanySummaryResponse struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Domain     string    `json:"domain"`
+	IsVerified bool      `json:"isVerified"`
 }
 
 // Register handles user registration
@@ -191,12 +209,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	response := AuthResponse{
 		User: UserResponse{
-			ID:          user.ID,
-			Email:       user.Email,
-			DisplayName: user.DisplayName,
-			AvatarURL:   user.AvatarURL,
-			IsAdmin:     user.IsAdmin,
-			CreatedAt:   user.CreatedAt,
+			ID:                 user.ID,
+			Email:              user.Email,
+			DisplayName:        user.DisplayName,
+			AvatarURL:          user.AvatarURL,
+			IsAdmin:            user.IsAdmin,
+			IsEmailVerified:    user.IsEmailVerified,
+			AuthProvider:       user.AuthProvider,
+			CompanyMemberships: []CompanyMemberResponse{},
+			CreatedAt:          user.CreatedAt,
+			LastActiveAt:       user.LastActiveAt,
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -226,7 +248,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Find user by email
 	var user models.User
-	if err := h.db.Where("email = ?", strings.ToLower(req.Email)).First(&user).Error; err != nil {
+	if err := h.db.Preload("CompanyMemberships.Company").Where("email = ?", strings.ToLower(req.Email)).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": gin.H{
 				"code":      "INVALID_CREDENTIALS",
@@ -290,14 +312,33 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	memberships := make([]CompanyMemberResponse, len(user.CompanyMemberships))
+	for i, m := range user.CompanyMemberships {
+		memberships[i] = CompanyMemberResponse{
+			ID:        m.ID,
+			CompanyID: m.CompanyID,
+			Role:      m.Role,
+			Company: CompanySummaryResponse{
+				ID:         m.Company.ID,
+				Name:       m.Company.Name,
+				Domain:     m.Company.Domain,
+				IsVerified: m.Company.IsVerified,
+			},
+		}
+	}
+
 	response := AuthResponse{
 		User: UserResponse{
-			ID:          user.ID,
-			Email:       user.Email,
-			DisplayName: user.DisplayName,
-			AvatarURL:   user.AvatarURL,
-			IsAdmin:     user.IsAdmin,
-			CreatedAt:   user.CreatedAt,
+			ID:                 user.ID,
+			Email:              user.Email,
+			DisplayName:        user.DisplayName,
+			AvatarURL:          user.AvatarURL,
+			IsAdmin:            user.IsAdmin,
+			IsEmailVerified:    user.IsEmailVerified,
+			AuthProvider:       user.AuthProvider,
+			CompanyMemberships: memberships,
+			CreatedAt:          user.CreatedAt,
+			LastActiveAt:       user.LastActiveAt,
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -589,7 +630,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	}
 
 	var user models.User
-	if err := h.db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := h.db.Preload("CompanyMemberships.Company").Where("id = ?", userID).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
 				"code":      "USER_NOT_FOUND",
@@ -600,13 +641,32 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
+	memberships := make([]CompanyMemberResponse, len(user.CompanyMemberships))
+	for i, m := range user.CompanyMemberships {
+		memberships[i] = CompanyMemberResponse{
+			ID:        m.ID,
+			CompanyID: m.CompanyID,
+			Role:      m.Role,
+			Company: CompanySummaryResponse{
+				ID:         m.Company.ID,
+				Name:       m.Company.Name,
+				Domain:     m.Company.Domain,
+				IsVerified: m.Company.IsVerified,
+			},
+		}
+	}
+
 	response := UserResponse{
-		ID:          user.ID,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		AvatarURL:   user.AvatarURL,
-		IsAdmin:     user.IsAdmin,
-		CreatedAt:   user.CreatedAt,
+		ID:                 user.ID,
+		Email:              user.Email,
+		DisplayName:        user.DisplayName,
+		AvatarURL:          user.AvatarURL,
+		IsAdmin:            user.IsAdmin,
+		IsEmailVerified:    user.IsEmailVerified,
+		AuthProvider:       user.AuthProvider,
+		CompanyMemberships: memberships,
+		CreatedAt:          user.CreatedAt,
+		LastActiveAt:       user.LastActiveAt,
 	}
 
 	c.JSON(http.StatusOK, gin.H{

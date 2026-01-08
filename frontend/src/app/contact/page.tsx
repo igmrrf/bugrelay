@@ -1,10 +1,22 @@
-import { MainLayout } from "@/components/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Mail, MessageSquare, Phone, MapPin, Clock, Send } from "lucide-react"
+import { MainLayout } from "@/components/layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Mail, MessageSquare, Phone, MapPin, Clock, Send } from "lucide-react";
 
 export default function ContactPage() {
   return (
@@ -54,11 +66,15 @@ export default function ContactPage() {
               <CardContent className="space-y-2">
                 <div>
                   <p className="font-medium">Discord</p>
-                  <p className="text-muted-foreground">Join our community chat</p>
+                  <p className="text-muted-foreground">
+                    Join our community chat
+                  </p>
                 </div>
                 <div>
                   <p className="font-medium">GitHub</p>
-                  <p className="text-muted-foreground">Contribute to our project</p>
+                  <p className="text-muted-foreground">
+                    Contribute to our project
+                  </p>
                 </div>
                 <div>
                   <p className="font-medium">Twitter</p>
@@ -76,8 +92,9 @@ export default function ContactPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  We typically respond to inquiries within 24 hours during business days. 
-                  For urgent issues, please use our support email.
+                  We typically respond to inquiries within 24 hours during
+                  business days. For urgent issues, please use our support
+                  email.
                 </p>
               </CardContent>
             </Card>
@@ -89,14 +106,18 @@ export default function ContactPage() {
               <CardHeader>
                 <CardTitle>Send us a Message</CardTitle>
                 <CardDescription>
-                  Fill out the form below and we'll get back to you as soon as possible.
+                  Fill out the form below and we'll get back to you as soon as
+                  possible.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label htmlFor="firstName" className="text-sm font-medium">
+                      <label
+                        htmlFor="firstName"
+                        className="text-sm font-medium"
+                      >
                         First Name *
                       </label>
                       <Input id="firstName" placeholder="John" required />
@@ -113,7 +134,12 @@ export default function ContactPage() {
                     <label htmlFor="email" className="text-sm font-medium">
                       Email Address *
                     </label>
-                    <Input id="email" type="email" placeholder="john@example.com" required />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      required
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -127,14 +153,18 @@ export default function ContactPage() {
                     <label htmlFor="subject" className="text-sm font-medium">
                       Subject *
                     </label>
-                    <Select required>
+                    <Select name="subject" required>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a subject" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="general">General Inquiry</SelectItem>
-                        <SelectItem value="support">Technical Support</SelectItem>
-                        <SelectItem value="business">Business Partnership</SelectItem>
+                        <SelectItem value="support">
+                          Technical Support
+                        </SelectItem>
+                        <SelectItem value="business">
+                          Business Partnership
+                        </SelectItem>
                         <SelectItem value="feedback">Feedback</SelectItem>
                         <SelectItem value="bug">Bug Report</SelectItem>
                         <SelectItem value="feature">Feature Request</SelectItem>
@@ -157,13 +187,13 @@ export default function ContactPage() {
 
                   <div className="space-y-4">
                     <div className="flex items-start space-x-2">
-                      <input
-                        type="checkbox"
-                        id="newsletter"
-                        className="mt-1"
-                      />
-                      <label htmlFor="newsletter" className="text-sm text-muted-foreground">
-                        I'd like to receive updates about BugRelay features and news
+                      <input type="checkbox" id="newsletter" className="mt-1" />
+                      <label
+                        htmlFor="newsletter"
+                        className="text-sm text-muted-foreground"
+                      >
+                        I'd like to receive updates about BugRelay features and
+                        news
                       </label>
                     </div>
 
@@ -174,13 +204,22 @@ export default function ContactPage() {
                         className="mt-1"
                         required
                       />
-                      <label htmlFor="privacy" className="text-sm text-muted-foreground">
+                      <label
+                        htmlFor="privacy"
+                        className="text-sm text-muted-foreground"
+                      >
                         I agree to the{" "}
-                        <a href="/privacy" className="text-primary hover:underline">
+                        <a
+                          href="/privacy"
+                          className="text-primary hover:underline"
+                        >
                           Privacy Policy
                         </a>{" "}
                         and{" "}
-                        <a href="/terms" className="text-primary hover:underline">
+                        <a
+                          href="/terms"
+                          className="text-primary hover:underline"
+                        >
                           Terms of Service
                         </a>
                         *
@@ -202,7 +241,9 @@ export default function ContactPage() {
         <div className="mt-16">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Frequently Asked Questions</CardTitle>
+              <CardTitle className="text-2xl">
+                Frequently Asked Questions
+              </CardTitle>
               <CardDescription>
                 Quick answers to common questions
               </CardDescription>
@@ -211,53 +252,74 @@ export default function ContactPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold mb-2">How do I report a bug?</h3>
+                    <h3 className="font-semibold mb-2">
+                      How do I report a bug?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
                       You can report bugs by visiting our{" "}
-                      <a href="/submit" className="text-primary hover:underline">
+                      <a
+                        href="/submit"
+                        className="text-primary hover:underline"
+                      >
                         Submit Bug
                       </a>{" "}
                       page. No account required!
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-2">How do I claim my company?</h3>
+                    <h3 className="font-semibold mb-2">
+                      How do I claim my company?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      Visit your company's page and click "Claim Company". You'll need to verify 
-                      your email address with your company domain.
+                      Visit your company's page and click "Claim Company".
+                      You'll need to verify your email address with your company
+                      domain.
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-2">Is BugRelay free to use?</h3>
+                    <h3 className="font-semibold mb-2">
+                      Is BugRelay free to use?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      Yes! BugRelay is free for users to report bugs and for companies to 
-                      manage their bug reports.
+                      Yes! BugRelay is free for users to report bugs and for
+                      companies to manage their bug reports.
                     </p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold mb-2">How do I delete my account?</h3>
+                    <h3 className="font-semibold mb-2">
+                      How do I delete my account?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      You can delete your account from your profile settings, or contact 
-                      our support team for assistance.
+                      You can delete your account from your profile settings, or
+                      contact our support team for assistance.
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-2">Can I integrate BugRelay with my tools?</h3>
+                    <h3 className="font-semibold mb-2">
+                      Can I integrate BugRelay with my tools?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      We offer API access for companies to integrate BugRelay with their 
-                      existing workflows. Check our{" "}
-                      <a href="/api-docs" className="text-primary hover:underline">
+                      We offer API access for companies to integrate BugRelay
+                      with their existing workflows. Check our{" "}
+                      <a
+                        href="/api-docs"
+                        className="text-primary hover:underline"
+                      >
                         API documentation
-                      </a>.
+                      </a>
+                      .
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-2">How do I report security issues?</h3>
+                    <h3 className="font-semibold mb-2">
+                      How do I report security issues?
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      Please email security@bugrelay.com for any security-related concerns. 
-                      We take security very seriously.
+                      Please email security@bugrelay.com for any
+                      security-related concerns. We take security very
+                      seriously.
                     </p>
                   </div>
                 </div>
@@ -267,5 +329,5 @@ export default function ContactPage() {
         </div>
       </div>
     </MainLayout>
-  )
+  );
 }

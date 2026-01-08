@@ -47,6 +47,22 @@ route:
         job: '(prometheus|alertmanager|grafana).*'
       receiver: 'monitoring-alerts'
 
+    # Deployment alerts - immediate notification for failures and rollbacks
+    - match:
+        alert_type: deployment
+      receiver: 'deployment-alerts'
+      group_wait: 10s
+      repeat_interval: 30m
+      routes:
+        # Critical deployment alerts (failures, rollbacks)
+        - match:
+            severity: critical
+          receiver: 'deployment-critical'
+        # Warning deployment alerts (health checks, long running)
+        - match:
+            severity: warning
+          receiver: 'deployment-warnings'
+
 receivers:
   # Default receiver for unmatched alerts
   - name: 'default-receiver'
@@ -261,6 +277,116 @@ receivers:
           Instance: {{ .Labels.instance }}
           Started: {{ .StartsAt }}
           {{ end }}
+
+  # Deployment alerts - general
+  - name: 'deployment-alerts'
+    email_configs:
+      - to: 'dev-team@bugrelay.local'
+        text: |
+          🚀 DEPLOYMENT ALERT - development 🚀
+          🚀 [dev DEPLOYMENT] {{ .GroupLabels.alertname }}
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+          Version: {{ .Labels.version }}
+          Deployer: {{ .Labels.deployer }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#deployments'
+        title: '🚀 [dev] Deployment: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Component:* {{ .Labels.component }}
+          *Version:* {{ .Labels.version }}
+          *Deployer:* {{ .Labels.deployer }}
+          *Environment:* development
+          {{ end }}
+        send_resolved: true
+
+  # Critical deployment alerts (failures, rollbacks)
+  - name: 'deployment-critical'
+    email_configs:
+      - to: 'ops-team@bugrelay.local,dev-team@bugrelay.local'
+        text: |
+          🚨 CRITICAL DEPLOYMENT ALERT - development 🚨
+          🚨 [dev DEPLOYMENT CRITICAL] {{ .GroupLabels.alertname }}
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+          Version: {{ .Labels.version }}
+          Deployer: {{ .Labels.deployer }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+          
+          Immediate attention required for deployment issue!
+        headers:
+          X-Priority: 'high'
+          X-Environment: 'development'
+
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#deployments-critical'
+        title: '🚨 [dev] Critical Deployment: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Component:* {{ .Labels.component }}
+          *Version:* {{ .Labels.version }}
+          *Deployer:* {{ .Labels.deployer }}
+          *Environment:* development
+          {{ end }}
+        send_resolved: true
+
+    # PagerDuty for critical deployment issues in production
+    pagerduty_configs:
+      - routing_key: '-'
+        description: '[dev] Critical Deployment: {{ .GroupLabels.alertname }} - {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+
+  # Warning deployment alerts (health checks, long running)
+  - name: 'deployment-warnings'
+    email_configs:
+      - to: 'dev-team@bugrelay.local'
+        text: |
+          ⚠️ DEPLOYMENT WARNING - development ⚠️
+          ⚠️ [dev DEPLOYMENT WARNING] {{ .GroupLabels.alertname }}
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Component: {{ .Labels.component }}
+          Version: {{ .Labels.version }}
+          Deployer: {{ .Labels.deployer }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services'
+        channel: '#deployments'
+        title: '⚠️ [dev] Deployment Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          
+          *Component:* {{ .Labels.component }}
+          *Version:* {{ .Labels.version }}
+          *Deployer:* {{ .Labels.deployer }}
+          *Environment:* development
+          {{ end }}
+        send_resolved: true
 
 inhibit_rules:
   # Inhibit warning alerts when critical alerts are firing

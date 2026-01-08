@@ -1,0 +1,630 @@
+name: Frontend Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'main'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+  DEPLOYMENT_USER: ${{ secrets.DO_USER }}
+  DEPLOYMENT_HOST: ${{ secrets.DO_HOST }}
+  DEPLOYMENT_PATH: /opt/bugrelay
+  HEALTH_CHECK_TIMEOUT: 60
+  HEALTH_CHECK_RETRIES: 5
+  NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: |
+          # Install ESLint if not present
+          if ! npm list eslint > /dev/null 2>&1; then
+            npm install --save-dev eslint @next/eslint-config-next
+          fi
+          # Run ESLint with Next.js configuration
+          npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0 --format json --output-file eslint-report.json || true
+          npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0
+
+      - name: Upload ESLint results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: eslint-report
+          path: frontend/eslint-report.json
+
+      - name: Run TypeScript type checking
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Check for TypeScript errors
+        working-directory: frontend
+        run: |
+          echo "TypeScript compilation check completed"
+          if ! npm run type-check; then
+            echo "TypeScript errors found"
+            exit 1
+          fi
+  test:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Jest tests
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-coverage
+          path: frontend/coverage/
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            frontend/coverage/coverage-final.json
+            frontend/coverage/lcov.info
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build production bundle
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.NEXT_PUBLIC_API_URL }}
+          NODE_ENV: production
+        run: |
+          npm run build
+          echo "Build completed successfully"
+
+      - name: Create deployment package
+        working-directory: frontend
+        run: |
+          mkdir -p deployment-package
+          # Copy standalone build output
+          cp -r .next/standalone/* deployment-package/
+          # Copy static files
+          mkdir -p deployment-package/.next/static
+          cp -r .next/static/* deployment-package/.next/static/
+          # Copy public files
+          cp -r public deployment-package/
+          # Create package info
+          echo "${{ github.sha }}" > deployment-package/VERSION
+          echo "${{ github.actor }}" > deployment-package/DEPLOYER
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > deployment-package/BUILD_TIME
+          # Create tarball
+          tar -czf bugrelay-frontend-${{ github.sha }}.tar.gz deployment-package/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend/bugrelay-frontend-${{ github.sha }}.tar.gz
+          retention-days: 30
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-info
+          path: |
+            frontend/deployment-package/VERSION
+            frontend/deployment-package/DEPLOYER
+            frontend/deployment-package/BUILD_TIME
+  deploy:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: ./artifacts
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup of current version
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/backups
+            if [ -d ${{ env.DEPLOYMENT_PATH }}/frontend ]; then
+              BACKUP_NAME=frontend-backup-$(date +%Y%m%d-%H%M%S)
+              sudo cp -r ${{ env.DEPLOYMENT_PATH }}/frontend ${{ env.DEPLOYMENT_PATH }}/backups/\$BACKUP_NAME
+              echo \"Backup created: \$BACKUP_NAME\"
+              # Keep only last 5 backups
+              sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/frontend-backup-* | tail -n +6 | sudo xargs rm -rf || true
+            fi
+          "
+
+      - name: Deploy new version (Rolling Update)
+        run: |
+          # Transfer new version
+          scp ./artifacts/bugrelay-frontend-${{ github.sha }}.tar.gz ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }}:/tmp/
+
+          # Deploy using rolling update strategy
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Create new deployment directory
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/frontend-new
+            
+            # Extract new version
+            cd /tmp
+            tar -xzf bugrelay-frontend-${{ github.sha }}.tar.gz
+            
+            # Copy to new deployment directory
+            sudo cp -r deployment-package/* ${{ env.DEPLOYMENT_PATH }}/frontend-new/
+            sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DEPLOYMENT_PATH }}/frontend-new
+            
+            # Set up environment for Next.js standalone
+            cd ${{ env.DEPLOYMENT_PATH }}/frontend-new
+            export PORT=3000
+            export HOSTNAME=0.0.0.0
+            export NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+            
+            # Start new version
+            sudo -E nohup node server.js > /var/log/bugrelay-frontend-new.log 2>&1 &
+            echo \$! | sudo tee /var/run/bugrelay-frontend-new.pid
+            
+            # Wait for service to start
+            sleep 15
+          "
+
+      - name: Update Nginx configuration
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Create temporary nginx config for new version
+            sudo tee /tmp/frontend-new.conf > /dev/null << 'EOF'
+            upstream frontend_new {
+                server 127.0.0.1:3000;
+            }
+            
+            server {
+                listen 80;
+                server_name ${{ env.DEPLOYMENT_HOST }};
+                
+                # Redirect HTTP to HTTPS
+                return 301 https://\$server_name\$request_uri;
+            }
+            
+            server {
+                listen 443 ssl http2;
+                server_name ${{ env.DEPLOYMENT_HOST }};
+                
+                # SSL configuration (assuming certificates are already set up)
+                ssl_certificate /etc/ssl/certs/bugrelay.crt;
+                ssl_certificate_key /etc/ssl/private/bugrelay.key;
+                
+                # Frontend routes
+                location / {
+                    proxy_pass http://frontend_new;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                    proxy_read_timeout 86400;
+                }
+                
+                # API routes (proxy to backend)
+                location /api/ {
+                    proxy_pass http://127.0.0.1:8080;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+                
+                # Static files caching
+                location /_next/static/ {
+                    proxy_pass http://frontend_new;
+                    expires 1y;
+                    add_header Cache-Control \"public, immutable\";
+                }
+                
+                # Health check endpoint
+                location /health {
+                    access_log off;
+                    return 200 \"healthy\n\";
+                    add_header Content-Type text/plain;
+                }
+            }
+            EOF
+            
+            # Test nginx configuration
+            sudo nginx -t -c /tmp/frontend-new.conf
+          "
+
+      - name: Store deployment metadata
+        run: |
+          echo "DEPLOYMENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "DEPLOYMENT_COMMIT=${{ github.sha }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_DEPLOYER=${{ github.actor }}" >> $GITHUB_ENV
+  verify:
+    name: Verify Frontend Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run frontend verification checks
+        id: verify_frontend
+        run: |
+          # Verification script
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Running frontend verification checks...'
+            
+            # Check if new frontend service is running
+            if ! pgrep -f 'node server.js' > /dev/null; then
+              echo 'ERROR: Frontend service not running'
+              exit 1
+            fi
+            
+            # Check frontend accessibility (new version on port 3000)
+            for i in \$(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+              if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:3000 > /dev/null; then
+                echo 'Frontend accessibility check: PASS'
+                break
+              else
+                echo \"Frontend accessibility check attempt \$i failed\"
+                if [ \$i -eq ${{ env.HEALTH_CHECK_RETRIES }} ]; then
+                  echo 'ERROR: Frontend accessibility check failed after all retries'
+                  exit 1
+                fi
+                sleep 10
+              fi
+            done
+            
+            # Verify static assets loading
+            if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:3000/_next/static/ > /dev/null; then
+              echo 'Static assets check: PASS'
+            else
+              echo 'WARNING: Static assets check failed (may be expected if no static assets)'
+            fi
+            
+            # Check API connectivity from frontend perspective
+            if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:3000/api/health > /dev/null; then
+              echo 'API connectivity check: PASS'
+            else
+              echo 'WARNING: API connectivity check failed (backend may not be running)'
+            fi
+            
+            # Check if frontend responds with valid HTML
+            RESPONSE=\$(curl -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} http://localhost:3000)
+            if echo \"\$RESPONSE\" | grep -q \"<html\"; then
+              echo 'HTML response check: PASS'
+            else
+              echo 'ERROR: Frontend not returning valid HTML'
+              exit 1
+            fi
+            
+            echo 'All frontend verification checks passed!'
+          "
+
+      - name: Switch to new version
+        if: success()
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Stop old frontend if running
+            if [ -f /var/run/bugrelay-frontend.pid ]; then
+              sudo kill \$(cat /var/run/bugrelay-frontend.pid) || true
+              sudo rm -f /var/run/bugrelay-frontend.pid
+            fi
+            
+            # Move current frontend to old
+            if [ -d ${{ env.DEPLOYMENT_PATH }}/frontend ]; then
+              sudo mv ${{ env.DEPLOYMENT_PATH }}/frontend ${{ env.DEPLOYMENT_PATH }}/frontend-old
+            fi
+            
+            # Move new to current
+            sudo mv ${{ env.DEPLOYMENT_PATH }}/frontend-new ${{ env.DEPLOYMENT_PATH }}/frontend
+            
+            # Update nginx configuration to use new version
+            sudo cp /tmp/frontend-new.conf /etc/nginx/sites-available/bugrelay-frontend
+            sudo ln -sf /etc/nginx/sites-available/bugrelay-frontend /etc/nginx/sites-enabled/bugrelay-frontend
+            
+            # Test and reload nginx
+            sudo nginx -t && sudo systemctl reload nginx
+            
+            # Update the main frontend service to run on port 3000
+            cd ${{ env.DEPLOYMENT_PATH }}/frontend
+            export PORT=3000
+            export HOSTNAME=0.0.0.0
+            export NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+            sudo -E nohup node server.js > /var/log/bugrelay-frontend.log 2>&1 &
+            echo \$! | sudo tee /var/run/bugrelay-frontend.pid
+            
+            # Clean up old version and temporary files
+            sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/frontend-old || true
+            sudo rm -f /var/run/bugrelay-frontend-new.pid || true
+            sudo rm -f /tmp/frontend-new.conf || true
+            
+            echo 'Rolling update deployment completed successfully'
+          "
+  rollback:
+    name: Rollback Frontend on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: failure()
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rollback to previous version
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Starting frontend rollback process...'
+            
+            # Stop new version if running
+            if [ -f /var/run/bugrelay-frontend-new.pid ]; then
+              sudo kill \$(cat /var/run/bugrelay-frontend-new.pid) || true
+              sudo rm -f /var/run/bugrelay-frontend-new.pid
+            fi
+            
+            # Remove failed new deployment
+            sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/frontend-new || true
+            
+            # Find latest backup
+            LATEST_BACKUP=\$(sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/frontend-backup-* 2>/dev/null | head -n 1)
+            
+            if [ -n \"\$LATEST_BACKUP\" ]; then
+              echo \"Restoring from backup: \$LATEST_BACKUP\"
+              
+              # Stop current frontend if running
+              if [ -f /var/run/bugrelay-frontend.pid ]; then
+                sudo kill \$(cat /var/run/bugrelay-frontend.pid) || true
+                sudo rm -f /var/run/bugrelay-frontend.pid
+              fi
+              
+              # Restore from backup
+              sudo rm -rf ${{ env.DEPLOYMENT_PATH }}/frontend || true
+              sudo cp -r \"\$LATEST_BACKUP\" ${{ env.DEPLOYMENT_PATH }}/frontend
+              sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.DEPLOYMENT_PATH }}/frontend
+              
+              # Restore previous nginx configuration
+              if [ -f /etc/nginx/sites-available/bugrelay-frontend.backup ]; then
+                sudo cp /etc/nginx/sites-available/bugrelay-frontend.backup /etc/nginx/sites-available/bugrelay-frontend
+              else
+                # Create basic nginx config for rollback
+                sudo tee /etc/nginx/sites-available/bugrelay-frontend > /dev/null << 'EOF'
+            upstream frontend {
+                server 127.0.0.1:3000;
+            }
+            
+            server {
+                listen 80;
+                server_name ${{ env.DEPLOYMENT_HOST }};
+                return 301 https://\$server_name\$request_uri;
+            }
+            
+            server {
+                listen 443 ssl http2;
+                server_name ${{ env.DEPLOYMENT_HOST }};
+                
+                ssl_certificate /etc/ssl/certs/bugrelay.crt;
+                ssl_certificate_key /etc/ssl/private/bugrelay.key;
+                
+                location / {
+                    proxy_pass http://frontend;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                }
+                
+                location /api/ {
+                    proxy_pass http://127.0.0.1:8080;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+            }
+            EOF
+              fi
+              
+              # Test and reload nginx
+              sudo nginx -t && sudo systemctl reload nginx
+              
+              # Start restored version
+              cd ${{ env.DEPLOYMENT_PATH }}/frontend
+              export PORT=3000
+              export HOSTNAME=0.0.0.0
+              export NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+              sudo -E nohup node server.js > /var/log/bugrelay-frontend.log 2>&1 &
+              echo \$! | sudo tee /var/run/bugrelay-frontend.pid
+              
+              # Wait and verify rollback
+              sleep 15
+              if curl -f -s --max-time 30 http://localhost:3000 > /dev/null; then
+                echo 'Rollback successful - frontend is accessible'
+              else
+                echo 'WARNING: Rollback completed but accessibility check failed'
+              fi
+            else
+              echo 'ERROR: No backup found for rollback'
+              exit 1
+            fi
+          "
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test, build, deploy, verify, rollback]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.verify.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=Frontend deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.rollback.result }}" == "success" ]]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+            echo "message=Frontend deployment failed and was rolled back" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "message=Frontend deployment failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "Frontend Deployment Notification",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.status.outputs.status }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "${{ github.sha }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Deployer",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.event.inputs.branch || github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Environment",
+                      "value": "${{ github.event.inputs.environment || 'production' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Timestamp",
+                      "value": "${{ env.DEPLOYMENT_TIMESTAMP || github.event.head_commit.timestamp }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Workflow",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": true
+                    }
+                  ],
+                  "text": "${{ steps.status.outputs.message }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,14 @@
+[Unit]
+Description=BugRelay Deployment Audit Log Rotation
+After=network.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+ExecStart=/opt/bugrelay/scripts/audit-log.sh rotate
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

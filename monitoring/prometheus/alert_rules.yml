@@ -100,3 +100,93 @@ groups:
         annotations:
           summary: "Rate limiting frequently triggered"
           description: "{{ $value }} rate limit violations in the last 5 minutes"
+
+  - name: deployment_alerts
+    rules:
+      # Deployment Failure
+      - alert: DeploymentFailure
+        expr: increase(deployment_total{status="failed"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          alert_type: deployment
+        annotations:
+          summary: "Deployment failed for {{ $labels.component }}"
+          description: "Deployment of {{ $labels.component }} version {{ $labels.version }} failed. Deployer: {{ $labels.deployer }}"
+
+      # Deployment Rollback
+      - alert: DeploymentRollback
+        expr: increase(deployment_total{status="rolled_back"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          alert_type: deployment
+        annotations:
+          summary: "Deployment rolled back for {{ $labels.component }}"
+          description: "Deployment of {{ $labels.component }} version {{ $labels.version }} was rolled back. Deployer: {{ $labels.deployer }}"
+
+      # Health Check Failure
+      - alert: DeploymentHealthCheckFailure
+        expr: increase(health_check_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          alert_type: deployment
+        annotations:
+          summary: "Health check failed for {{ $labels.component }}"
+          description: "Health check {{ $labels.check_type }} failed for {{ $labels.component }} during deployment"
+
+      # Long Running Deployment
+      - alert: LongRunningDeployment
+        expr: deployment_duration_seconds > 600
+        for: 0m
+        labels:
+          severity: warning
+          alert_type: deployment
+        annotations:
+          summary: "Long running deployment for {{ $labels.component }}"
+          description: "Deployment of {{ $labels.component }} has been running for {{ $value }} seconds"
+
+      # High Deployment Failure Rate
+      - alert: HighDeploymentFailureRate
+        expr: (sum(rate(deployment_total{status="failed"}[1h])) / sum(rate(deployment_total[1h]))) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          alert_type: deployment
+        annotations:
+          summary: "High deployment failure rate"
+          description: "Deployment failure rate is {{ $value | humanizePercentage }} over the last hour"
+
+      # Frequent Rollbacks
+      - alert: FrequentRollbacks
+        expr: sum(increase(deployment_total{status="rolled_back"}[24h])) > 3
+        for: 0m
+        labels:
+          severity: warning
+          alert_type: deployment
+        annotations:
+          summary: "Frequent rollbacks detected"
+          description: "{{ $value }} rollbacks occurred in the last 24 hours"
+
+      # Deployment Stuck
+      - alert: DeploymentStuck
+        expr: time() - deployment_start_time > 1800
+        for: 0m
+        labels:
+          severity: critical
+          alert_type: deployment
+        annotations:
+          summary: "Deployment appears stuck for {{ $labels.component }}"
+          description: "Deployment of {{ $labels.component }} has been in progress for over 30 minutes"
+
+      # Zero Downtime Violation
+      - alert: ZeroDowntimeViolation
+        expr: increase(deployment_downtime_seconds[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          alert_type: deployment
+        annotations:
+          summary: "Zero-downtime deployment violated for {{ $labels.component }}"
+          description: "Deployment of {{ $labels.component }} caused {{ $value }} seconds of downtime"

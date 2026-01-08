@@ -1,0 +1,423 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Deployment Metrics",
+    "tags": ["bugrelay", "deployment", "ci-cd"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Deployment Frequency (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(deployment_total[24h])",
+            "legendFormat": "Deployments"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 5
+                  },
+                  {
+                    "color": "red",
+                    "value": 10
+                  }
+                ]
+              }
+            },
+            "unit": "short",
+            "displayName": "Deployments (24h)"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Average Deployment Duration",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(deployment_duration_seconds)",
+            "legendFormat": "Avg Duration"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 300
+                  },
+                  {
+                    "color": "red",
+                    "value": 600
+                  }
+                ]
+              }
+            },
+            "unit": "s",
+            "displayName": "Avg Duration"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Deployment Success Rate (7d)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(sum(increase(deployment_total{status=\"success\"}[7d])) / sum(increase(deployment_total[7d]))) * 100",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 90
+                  },
+                  {
+                    "color": "green",
+                    "value": 95
+                  }
+                ]
+              }
+            },
+            "unit": "percent",
+            "displayName": "Success Rate (7d)",
+            "max": 100,
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Rollback Frequency (7d)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(deployment_total{status=\"rolled_back\"}[7d]))",
+            "legendFormat": "Rollbacks"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "unit": "short",
+            "displayName": "Rollbacks (7d)"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "Deployments by Component",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(deployment_total[5m])",
+            "legendFormat": "{{component}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "displayName": "Deployments/min"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Deployment Status Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(deployment_total{status=\"success\"}[5m])",
+            "legendFormat": "Success"
+          },
+          {
+            "expr": "rate(deployment_total{status=\"failed\"}[5m])",
+            "legendFormat": "Failed"
+          },
+          {
+            "expr": "rate(deployment_total{status=\"rolled_back\"}[5m])",
+            "legendFormat": "Rolled Back"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "Deployment Duration Distribution",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(deployment_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(deployment_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(deployment_duration_seconds_bucket[5m]))",
+            "legendFormat": "99th percentile"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "s"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "Health Check Failures",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(health_check_failures_total[5m])",
+            "legendFormat": "{{component}} - {{check_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 9,
+        "title": "Recent Deployments",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "deployment_info",
+            "legendFormat": "",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "status"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "options": {
+                        "success": {
+                          "color": "green",
+                          "index": 0
+                        },
+                        "failed": {
+                          "color": "red",
+                          "index": 1
+                        },
+                        "rolled_back": {
+                          "color": "orange",
+                          "index": 2
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "job": true,
+                "instance": true
+              },
+              "indexByName": {
+                "component": 0,
+                "version": 1,
+                "status": 2,
+                "deployer": 3,
+                "timestamp": 4,
+                "duration": 5
+              },
+              "renameByName": {
+                "component": "Component",
+                "version": "Version",
+                "status": "Status",
+                "deployer": "Deployer",
+                "timestamp": "Timestamp",
+                "duration": "Duration (s)"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "deployment_total",
+          "iconColor": "blue",
+          "titleFormat": "{{component}} deployment",
+          "textFormat": "Status: {{status}}, Version: {{version}}, Deployer: {{deployer}}"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "component",
+          "type": "query",
+          "query": "label_values(deployment_total, component)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true
+        }
+      ]
+    }
+  }
+}

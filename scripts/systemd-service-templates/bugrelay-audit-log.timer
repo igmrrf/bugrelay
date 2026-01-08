@@ -1,0 +1,11 @@
+[Unit]
+Description=Run BugRelay Audit Log Rotation Daily
+Requires=bugrelay-audit-log.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

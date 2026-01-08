@@ -1,20 +1,22 @@
-import { MainLayout } from "@/components/layout"
-import { CompanyClaimForm } from "@/components/companies/company-claim-form"
+import { MainLayout } from "@/components/layout";
+import { CompanyClaimContainer } from "@/components/companies/company-claim-container";
 
 interface CompanyClaimPageProps {
   params: Promise<{
-    id: string
-  }>
+    id: string;
+  }>;
 }
 
-export default async function CompanyClaimPage({ params }: CompanyClaimPageProps) {
-  const { id } = await params
-  
+export default async function CompanyClaimPage({
+  params,
+}: CompanyClaimPageProps) {
+  const { id } = await params;
+
   return (
     <MainLayout>
       <div className="container py-8">
-        <CompanyClaimForm />
+        <CompanyClaimContainer companyId={id} />
       </div>
     </MainLayout>
-  )
+  );
 }

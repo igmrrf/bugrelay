@@ -1,0 +1,527 @@
+name: Monitoring Stack Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'monitoring/**'
+      - '.github/workflows/monitoring-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch or tag to deploy'
+        required: true
+        default: 'main'
+        type: string
+      services:
+        description: 'Services to deploy (comma-separated: prometheus,grafana,loki,alertmanager,all)'
+        required: true
+        default: 'all'
+        type: string
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  DEPLOYMENT_USER: ${{ secrets.DO_USER }}
+  DEPLOYMENT_HOST: ${{ secrets.DO_HOST }}
+  DEPLOYMENT_PATH: /opt/bugrelay
+  MONITORING_PATH: /opt/bugrelay/monitoring
+  HEALTH_CHECK_TIMEOUT: 60
+  HEALTH_CHECK_RETRIES: 5
+
+jobs:
+  validate-config:
+    name: Validate Monitoring Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Prometheus configuration
+        run: |
+          echo "Validating Prometheus configuration..."
+          # Use official Prometheus image to validate config
+          docker run --rm \
+            -v ${{ github.workspace }}/monitoring/prometheus:/etc/prometheus \
+            prom/prometheus:latest \
+            promtool check config /etc/prometheus/prometheus.yml
+          
+          # Validate alert rules if they exist
+          if [ -f monitoring/prometheus/alert_rules.yml ]; then
+            docker run --rm \
+              -v ${{ github.workspace }}/monitoring/prometheus:/etc/prometheus \
+              prom/prometheus:latest \
+              promtool check rules /etc/prometheus/alert_rules.yml
+          fi
+
+      - name: Validate Grafana dashboard JSON
+        run: |
+          echo "Validating Grafana dashboard JSON..."
+          # Check if dashboard JSON files are valid
+          for dashboard in monitoring/grafana/dashboards/*.json; do
+            if [ -f "$dashboard" ]; then
+              echo "Validating $dashboard"
+              # Use jq to validate JSON syntax
+              if ! jq empty "$dashboard"; then
+                echo "ERROR: Invalid JSON in $dashboard"
+                exit 1
+              fi
+              echo "✓ $dashboard is valid JSON"
+            fi
+          done
+
+      - name: Validate Loki configuration
+        run: |
+          echo "Validating Loki configuration..."
+          # Use official Loki image to validate config
+          docker run --rm \
+            -v ${{ github.workspace }}/monitoring/loki:/etc/loki \
+            grafana/loki:latest \
+            -config.file=/etc/loki/config.yml \
+            -verify-config
+
+      - name: Validate AlertManager configuration
+        run: |
+          echo "Validating AlertManager configuration..."
+          # Use official AlertManager image to validate config
+          docker run --rm \
+            -v ${{ github.workspace }}/monitoring/alertmanager:/etc/alertmanager \
+            prom/alertmanager:latest \
+            amtool check-config /etc/alertmanager/alertmanager.yml
+
+      - name: Validate Docker Compose configuration
+        run: |
+          echo "Validating Docker Compose configuration..."
+          cd monitoring
+          # Check if docker-compose.yml is valid
+          docker-compose config > /dev/null
+          echo "✓ Docker Compose configuration is valid"
+
+      - name: Create validation report
+        run: |
+          echo "Configuration validation completed successfully" > validation-report.txt
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> validation-report.txt
+          echo "Commit: ${{ github.sha }}" >> validation-report.txt
+          echo "Branch: ${{ github.event.inputs.branch || github.ref_name }}" >> validation-report.txt
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-report
+          path: validation-report.txt
+
+  deploy:
+    name: Deploy Monitoring Stack
+    runs-on: ubuntu-latest
+    needs: validate-config
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup of current monitoring configuration
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            sudo mkdir -p ${{ env.DEPLOYMENT_PATH }}/backups
+            if [ -d ${{ env.MONITORING_PATH }} ]; then
+              BACKUP_NAME=monitoring-backup-$(date +%Y%m%d-%H%M%S)
+              sudo cp -r ${{ env.MONITORING_PATH }} ${{ env.DEPLOYMENT_PATH }}/backups/\$BACKUP_NAME
+              echo \"Monitoring backup created: \$BACKUP_NAME\"
+              # Keep only last 5 backups
+              sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/monitoring-backup-* | tail -n +6 | sudo xargs rm -rf || true
+            fi
+          "
+
+      - name: Create monitoring deployment package
+        run: |
+          # Create deployment package
+          mkdir -p deployment-package
+          cp -r monitoring/* deployment-package/
+          
+          # Add deployment metadata
+          echo "${{ github.sha }}" > deployment-package/VERSION
+          echo "${{ github.actor }}" > deployment-package/DEPLOYER
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > deployment-package/DEPLOY_TIME
+          echo "${{ github.event.inputs.services || 'all' }}" > deployment-package/SERVICES
+          
+          # Create tarball
+          tar -czf monitoring-deployment-${{ github.sha }}.tar.gz deployment-package/
+
+      - name: Transfer monitoring configuration
+        run: |
+          # Transfer new configuration
+          scp monitoring-deployment-${{ github.sha }}.tar.gz ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }}:/tmp/
+
+      - name: Deploy updated monitoring configs
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            # Extract new configuration
+            cd /tmp
+            tar -xzf monitoring-deployment-${{ github.sha }}.tar.gz
+            
+            # Create monitoring directory if it doesn't exist
+            sudo mkdir -p ${{ env.MONITORING_PATH }}
+            
+            # Stop monitoring services gracefully (preserve data)
+            echo 'Stopping monitoring services gracefully...'
+            cd ${{ env.MONITORING_PATH }}
+            if [ -f docker-compose.yml ]; then
+              sudo docker-compose down --remove-orphans || true
+            fi
+            
+            # Deploy new configuration
+            echo 'Deploying new monitoring configuration...'
+            sudo cp -r /tmp/deployment-package/* ${{ env.MONITORING_PATH }}/
+            sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.MONITORING_PATH }}
+            
+            # Set proper permissions
+            sudo chmod 644 ${{ env.MONITORING_PATH }}/*.yml
+            sudo chmod 644 ${{ env.MONITORING_PATH }}/*/*.yml
+            sudo chmod 644 ${{ env.MONITORING_PATH }}/*/*.json
+            
+            # Create necessary directories with proper permissions
+            sudo mkdir -p ${{ env.MONITORING_PATH }}/data/{prometheus,grafana,loki,alertmanager}
+            sudo chown -R 472:472 ${{ env.MONITORING_PATH }}/data/grafana || true
+            sudo chown -R 10001:10001 ${{ env.MONITORING_PATH }}/data/loki || true
+            sudo chown -R 65534:65534 ${{ env.MONITORING_PATH }}/data/prometheus || true
+            sudo chown -R 65534:65534 ${{ env.MONITORING_PATH }}/data/alertmanager || true
+            
+            echo 'Monitoring configuration deployed successfully'
+          "
+
+      - name: Restart monitoring services gracefully
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            cd ${{ env.MONITORING_PATH }}
+            
+            # Determine which services to restart
+            SERVICES='${{ github.event.inputs.services || 'all' }}'
+            
+            if [ \"\$SERVICES\" = 'all' ]; then
+              echo 'Starting all monitoring services...'
+              sudo docker-compose up -d
+            else
+              echo \"Starting selected services: \$SERVICES\"
+              # Convert comma-separated list to space-separated
+              SERVICE_LIST=\$(echo \"\$SERVICES\" | tr ',' ' ')
+              sudo docker-compose up -d \$SERVICE_LIST
+            fi
+            
+            # Wait for services to start
+            sleep 30
+            
+            echo 'Monitoring services restarted'
+          "
+
+      - name: Store deployment metadata
+        run: |
+          echo "DEPLOYMENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "DEPLOYMENT_COMMIT=${{ github.sha }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_DEPLOYER=${{ github.actor }}" >> $GITHUB_ENV
+          echo "DEPLOYMENT_SERVICES=${{ github.event.inputs.services || 'all' }}" >> $GITHUB_ENV
+
+  health-check:
+    name: Health Check Monitoring Services
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run monitoring health checks
+        id: health_check
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Running monitoring health checks...'
+            cd ${{ env.MONITORING_PATH }}
+            
+            # Check which services should be running
+            SERVICES='${{ github.event.inputs.services || 'all' }}'
+            
+            # Function to check service health
+            check_service_health() {
+              local service=\$1
+              local port=\$2
+              local endpoint=\$3
+              
+              echo \"Checking \$service health...\"
+              for i in \$(seq 1 ${{ env.HEALTH_CHECK_RETRIES }}); do
+                if curl -f -s --max-time ${{ env.HEALTH_CHECK_TIMEOUT }} \"http://localhost:\$port\$endpoint\" > /dev/null; then
+                  echo \"\$service health check: PASS\"
+                  return 0
+                else
+                  echo \"\$service health check attempt \$i failed\"
+                  if [ \$i -eq ${{ env.HEALTH_CHECK_RETRIES }} ]; then
+                    echo \"ERROR: \$service health check failed after all retries\"
+                    return 1
+                  fi
+                  sleep 10
+                fi
+              done
+            }
+            
+            # Check Grafana if it should be running
+            if [ \"\$SERVICES\" = 'all' ] || echo \"\$SERVICES\" | grep -q 'grafana'; then
+              if ! check_service_health 'Grafana' '3001' '/api/health'; then
+                exit 1
+              fi
+            fi
+            
+            # Check Prometheus if it should be running
+            if [ \"\$SERVICES\" = 'all' ] || echo \"\$SERVICES\" | grep -q 'prometheus'; then
+              if ! check_service_health 'Prometheus' '9090' '/-/healthy'; then
+                exit 1
+              fi
+              
+              # Additional check: verify Prometheus is scraping metrics
+              echo 'Checking if Prometheus is scraping metrics...'
+              TARGETS=\$(curl -s http://localhost:9090/api/v1/targets | jq -r '.data.activeTargets | length')
+              if [ \"\$TARGETS\" -gt 0 ]; then
+                echo \"Prometheus is scraping \$TARGETS targets: PASS\"
+              else
+                echo 'WARNING: Prometheus has no active targets'
+              fi
+            fi
+            
+            # Check Loki if it should be running
+            if [ \"\$SERVICES\" = 'all' ] || echo \"\$SERVICES\" | grep -q 'loki'; then
+              if ! check_service_health 'Loki' '3100' '/ready'; then
+                exit 1
+              fi
+              
+              # Additional check: verify Loki is receiving logs
+              echo 'Checking if Loki is receiving logs...'
+              # This is a basic check - in production you might want more sophisticated log verification
+              if curl -s \"http://localhost:3100/loki/api/v1/label\" | jq -e '.data | length > 0' > /dev/null; then
+                echo 'Loki is receiving logs: PASS'
+              else
+                echo 'WARNING: Loki may not be receiving logs yet (this is normal for new deployments)'
+              fi
+            fi
+            
+            # Check AlertManager if it should be running
+            if [ \"\$SERVICES\" = 'all' ] || echo \"\$SERVICES\" | grep -q 'alertmanager'; then
+              if ! check_service_health 'AlertManager' '9093' '/-/healthy'; then
+                exit 1
+              fi
+            fi
+            
+            # Check Docker containers are running
+            echo 'Checking Docker container status...'
+            RUNNING_CONTAINERS=\$(sudo docker-compose ps --services --filter \"status=running\" | wc -l)
+            TOTAL_CONTAINERS=\$(sudo docker-compose ps --services | wc -l)
+            echo \"Running containers: \$RUNNING_CONTAINERS/\$TOTAL_CONTAINERS\"
+            
+            if [ \$RUNNING_CONTAINERS -eq 0 ]; then
+              echo 'ERROR: No monitoring containers are running'
+              exit 1
+            fi
+            
+            echo 'All monitoring health checks passed!'
+          "
+
+  rollback:
+    name: Rollback Monitoring on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, health-check]
+    if: failure()
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.DEPLOYMENT_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rollback to previous monitoring configuration
+        run: |
+          ssh ${{ env.DEPLOYMENT_USER }}@${{ env.DEPLOYMENT_HOST }} "
+            echo 'Starting monitoring rollback process...'
+            
+            # Stop current monitoring services
+            cd ${{ env.MONITORING_PATH }}
+            if [ -f docker-compose.yml ]; then
+              sudo docker-compose down --remove-orphans || true
+            fi
+            
+            # Find latest backup
+            LATEST_BACKUP=\$(sudo ls -t ${{ env.DEPLOYMENT_PATH }}/backups/monitoring-backup-* 2>/dev/null | head -n 1)
+            
+            if [ -n \"\$LATEST_BACKUP\" ]; then
+              echo \"Restoring from backup: \$LATEST_BACKUP\"
+              
+              # Remove current configuration
+              sudo rm -rf ${{ env.MONITORING_PATH }}/* || true
+              
+              # Restore from backup
+              sudo cp -r \"\$LATEST_BACKUP\"/* ${{ env.MONITORING_PATH }}/
+              sudo chown -R ${{ env.DEPLOYMENT_USER }}:${{ env.DEPLOYMENT_USER }} ${{ env.MONITORING_PATH }}
+              
+              # Restart monitoring services with restored configuration
+              cd ${{ env.MONITORING_PATH }}
+              sudo docker-compose up -d
+              
+              # Wait for services to start
+              sleep 30
+              
+              # Verify rollback with basic health checks
+              echo 'Verifying rollback...'
+              HEALTH_CHECKS_PASSED=0
+              
+              # Check Grafana
+              if curl -f -s --max-time 30 http://localhost:3001/api/health > /dev/null; then
+                echo 'Grafana rollback verification: PASS'
+                HEALTH_CHECKS_PASSED=\$((HEALTH_CHECKS_PASSED + 1))
+              else
+                echo 'WARNING: Grafana rollback verification failed'
+              fi
+              
+              # Check Prometheus
+              if curl -f -s --max-time 30 http://localhost:9090/-/healthy > /dev/null; then
+                echo 'Prometheus rollback verification: PASS'
+                HEALTH_CHECKS_PASSED=\$((HEALTH_CHECKS_PASSED + 1))
+              else
+                echo 'WARNING: Prometheus rollback verification failed'
+              fi
+              
+              # Check Loki
+              if curl -f -s --max-time 30 http://localhost:3100/ready > /dev/null; then
+                echo 'Loki rollback verification: PASS'
+                HEALTH_CHECKS_PASSED=\$((HEALTH_CHECKS_PASSED + 1))
+              else
+                echo 'WARNING: Loki rollback verification failed'
+              fi
+              
+              # Check AlertManager
+              if curl -f -s --max-time 30 http://localhost:9093/-/healthy > /dev/null; then
+                echo 'AlertManager rollback verification: PASS'
+                HEALTH_CHECKS_PASSED=\$((HEALTH_CHECKS_PASSED + 1))
+              else
+                echo 'WARNING: AlertManager rollback verification failed'
+              fi
+              
+              if [ \$HEALTH_CHECKS_PASSED -gt 0 ]; then
+                echo \"Rollback successful - \$HEALTH_CHECKS_PASSED services are healthy\"
+              else
+                echo 'WARNING: Rollback completed but no services passed health checks'
+              fi
+            else
+              echo 'ERROR: No backup found for rollback'
+              echo 'Attempting to restart current configuration...'
+              cd ${{ env.MONITORING_PATH }}
+              sudo docker-compose up -d || true
+              exit 1
+            fi
+          "
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [validate-config, deploy, health-check, rollback]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.health-check.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=Monitoring stack deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.rollback.result }}" == "success" ]]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+            echo "message=Monitoring stack deployment failed and was rolled back" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "message=Monitoring stack deployment failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "Monitoring Stack Deployment Notification",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.status.outputs.status }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "${{ github.sha }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Deployer",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.event.inputs.branch || github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Services",
+                      "value": "${{ github.event.inputs.services || 'all' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Environment",
+                      "value": "${{ github.event.inputs.environment || 'production' }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Timestamp",
+                      "value": "${{ env.DEPLOYMENT_TIMESTAMP || github.event.head_commit.timestamp }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Workflow",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": true
+                    }
+                  ],
+                  "text": "${{ steps.status.outputs.message }}"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

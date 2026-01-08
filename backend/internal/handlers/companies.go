@@ -1133,3 +1133,52 @@ func (h *CompanyHandler) GetCompanyDashboard(c *gin.Context) {
 		"recent_bugs": recentBugs,
 	})
 }
+
+// SearchCompanies searches for companies by name
+func (h *CompanyHandler) SearchCompanies(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":      "MISSING_QUERY",
+				"message":   "Search query parameter 'q' is required",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	limit := 10
+	if limitParam := c.DefaultQuery("limit", "10"); limitParam != "" {
+		fmt.Sscanf(limitParam, "%d", &limit)
+		if limit < 1 {
+			limit = 10
+		}
+		if limit > 50 {
+			limit = 50
+		}
+	}
+
+	// Search companies by name (case-insensitive)
+	var companies []models.Company
+	searchQuery := strings.ToLower(query)
+	
+	if err := h.db.Where("LOWER(name) LIKE ?", "%"+searchQuery+"%").
+		Order("is_verified DESC, name ASC").
+		Limit(limit).
+		Find(&companies).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":      "SEARCH_FAILED",
+				"message":   "Failed to search companies",
+				"timestamp": time.Now().UTC(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"companies": companies,
+		"count":     len(companies),
+	})
+}
