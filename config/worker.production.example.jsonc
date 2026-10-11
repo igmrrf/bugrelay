@@ -1,0 +1,22 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bugrelay-api",
+  "main": "../worker/src/index.ts",
+  "account_id": "REPLACE_WITH_VERIFIED_ACCOUNT_ID",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": {"cpu_ms": 30000},
+  "observability": {"enabled": true, "logs": {"invocation_logs": false}},
+  "vars": {
+    "APP_ORIGIN": "https://bugrelay.com",
+    "ENVIRONMENT": "production",
+    "EMAIL_FROM": "notifications@bugrelay.com",
+    "TURNSTILE_SITE_KEY": "REPLACE_WITH_PRODUCTION_SITE_KEY"
+  },
+  "d1_databases": [{"binding":"DB","database_name":"bugrelay-production","database_id":"REPLACE_WITH_FRESH_D1_DATABASE_ID","migrations_dir":"../worker/migrations"}],
+  "r2_buckets": [{"binding":"ATTACHMENTS","bucket_name":"REPLACE_WITH_PRIVATE_PRODUCTION_BUCKET"}],
+  "send_email": [{"name":"EMAIL","allowed_sender_addresses":["notifications@bugrelay.com"]}],
+  "triggers": {"crons":["17 3 * * *"]}
+}

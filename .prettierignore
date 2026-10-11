@@ -1,0 +1,6 @@
+legacy/
+node_modules/
+.next/
+.open-next/
+.wrangler/
+package-lock.json

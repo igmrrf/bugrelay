@@ -1,0 +1,33 @@
+# API v1
+
+All browser calls use `/api/v1` on the application origin, with HttpOnly session cookies. There are no bearer/refresh tokens in localStorage. Mutations require the exact Origin and JSON content type, except multipart attachment uploads. Errors use `{error:{code,message,requestId}}`. Lists use `{items,total,page,limit,hasNextPage}`; page size is capped at 100. Responses use no-store.
+
+| Area | Routes |
+| --- | --- |
+| Health/config | `GET /health`, `GET /config` |
+| Registration/session | `POST /auth/register`, `/auth/login`, `/auth/logout`; `GET/PATCH /auth/profile` |
+| Session management | `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/sessions/revoke-all` |
+| Email/password | `POST /auth/verify-email/request`, `/auth/verify-email/confirm`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password` |
+| OAuth | `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback`, `GET /auth/oauth/accounts`, `POST /auth/oauth/:provider/link` |
+| Reports | `GET/POST /bugs`, `GET/PATCH/DELETE /bugs/:id`, `POST /bugs/search-duplicates`, `PATCH /bugs/:id/status` |
+| Discussion | `POST/DELETE /bugs/:id/vote`, `GET/POST /bugs/:id/comments`, `PATCH/DELETE /bugs/:id/comments/:commentId`, `POST /bugs/:id/report`, `POST /bugs/:id/comments/:commentId/replies`, `POST /bugs/:id/comments/:commentId/report` |
+| Attachments | `POST /bugs/:id/attachments` (`file` multipart field), `GET/DELETE /bugs/:id/attachments/:attachmentId` |
+| Companies | `GET/POST /companies`, `GET /companies/:id`, `/companies/:id/bugs`, `/companies/:id/analytics`; `PATCH /companies/:id/settings` |
+| Company proof/team | `POST /companies/:id/claim`, `/companies/:id/verify`; `GET/POST /companies/:id/members`, `PATCH/DELETE /companies/:id/members/:memberId` |
+| Platform admin | `GET /admin/stats`, `/admin/users`, `/admin/moderation`, `/admin/bugs/deleted`, `/admin/audit-logs`, `/admin/export/audit-logs`; `PATCH /admin/users/:id/role`, `/admin/companies/:id/verify`; `POST /admin/users/:id/suspend`, `/admin/users/:id/unsuspend`, `/admin/moderation/:id`, `/admin/bugs/:id/restore`, `/admin/bugs/merge`; `PATCH /admin/bugs/bulk/status` |
+
+`GET /bugs` supports `q`, `status`, `companyId`, `tag`, `mine=true`, `sort=votes`, `page`, and `limit`. Search is escaped case-insensitive substring matching across title, description, application and company; duplicate suggestions match title words. It is not advertised as semantic search. All search/count operations include the current visibility predicate before pagination.
+
+Report requests and response DTOs live in `packages/contracts/src/index.ts`. Visibility is explicit and security category forces private. Update requests intentionally cannot change visibility or impersonate another author. A registered product name is not proof of company ownership.
+
+New passwords must be at least 12 characters and at most 72 UTF-8 bytes. Verification/reset/claim tokens arrive by email, expire after one hour, and are never returned from request endpoints. OAuth success redirects to `/dashboard`; disabled providers return 404.
+
+Discussion lists paginate root comments by default; `parentId` selects one comment’s direct replies. Counts describe that sibling level. Comment DTOs include `parentId`, `depth`, `replyCount` and `isDeleted`; removed parent text is replaced by a tombstone. Reply nesting is bounded at five levels. Parent relationships and authors cannot be changed through updates.
+
+OAuth linking starts with an Origin-protected POST from a verified session. Password accounts supply `currentPassword`; passwordless accounts require a session created in the last ten minutes. The returned provider URL carries a one-time intent bound to the browser and exact user/session. Callback rechecks live authorization after provider requests. Linking never changes the account email or reassigns an existing provider identity.
+
+Report DTOs include `resolvedAt`. `resolved`/`closed` preserve the first terminal timestamp until reopening. Company analytics returns `resolvedBugCount` and nullable `averageResolutionHours` for accessible nondeleted reports currently in a terminal state. This measures report age at resolution, not staff working time or a promised SLA.
+
+## Company authorization review
+
+`POST /companies/:id/claim` sends mailbox proof. `POST /companies/:id/verify` consumes that proof and returns `{ claim, message }` with `claim.status=pending`; it does not grant ownership. `GET /companies/:id/claim` returns only the signed-in applicant’s latest status. `GET /admin/company-claims` paginates pending requests for platform administrators. `POST /admin/company-claims/:id/review` accepts `decision` (`approved` or `rejected`), a 20–2000-character `evidence` record, and `domainControlVerified:true` for approval. Self review is rejected. The live reviewer/claimant checks, transition, membership grant and audit are atomic.

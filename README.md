@@ -1,254 +1,60 @@
-# BugRelay - Public Bug Tracking Platform
+# BugRelay
 
-A modern, scalable bug tracking platform that bridges the gap between users who discover bugs and companies who need to fix them.
+BugRelay connects people reporting software problems with the teams that can fix them. This branch migrates the product to native Cloudflare Workers with a fresh database. No historical data import is required.
 
-## 📚 Documentation
+## Runtime
 
-**🚀 Live Documentation: http://localhost:3001/ (when running locally)**
+- `frontend/`: Next.js 16 with OpenNext, same-origin `/api/v1` requests.
+- `worker/`: TypeScript/Hono API, D1 SQL, private R2 attachments, Cloudflare Email Sending.
+- `packages/contracts/`: shared validated requests and safe camelCase response types.
+- `config/`: reviewable production templates for `https://bugrelay.com` and `notifications@bugrelay.com`.
+- `legacy/`: historical Go/PostgreSQL/Redis deployment and documentation, excluded from the runtime and CI. Do not deploy it.
 
-Our comprehensive documentation system includes:
+## Local development
 
-- **[Quick Start Guide](docs/guides/quick-start.md)** - Get up and running in minutes with complete examples
-- **[API Reference](docs/api/)** - Complete REST API documentation with interactive examples
-- **[Authentication Guide](docs/authentication/)** - JWT and OAuth implementation with code samples
-- **[Data Models](docs/models/)** - Database schemas, relationships, and JSON schemas
-- **[Deployment Guide](docs/deployment/)** - Docker, Kubernetes, and production setup instructions
-- **[MCP Integration](docs/mcp/)** - AI system integration via Model Context Protocol
+Use Node.js 24 and npm. No Cloudflare credentials are needed for local development.
 
-### Documentation Features
-
-- **Interactive Examples**: Test API endpoints directly in the browser
-- **Auto-Generated Content**: API docs generated from Go codebase
-- **Multi-Language Examples**: Code samples in JavaScript, Python, Go, and curl
-- **Comprehensive Guides**: Step-by-step tutorials for all major features
-- **Search & Navigation**: Fast search and intuitive navigation
-- **Mobile Friendly**: Responsive design for all devices
-
-## Architecture
-
-- **Frontend**: Next.js 15 with TypeScript and TailwindCSS
-- **Backend**: Go with Gin framework
-- **Database**: PostgreSQL with Redis for caching
-- **Authentication**: JWT with OAuth integration (Google, GitHub)
-- **Documentation**: VitePress with automated generation from codebase
-
-## Quick Start
-
-### Prerequisites
-
-- Docker and Docker Compose
-- Node.js 18+ (for local development)
-- Go 1.21+ (for local development)
-
-### Development Setup
-
-1. **Clone and setup the project:**
-   ```bash
-   git clone <repository-url>
-   cd bugrelay
-   cp .env.example .env
-   ```
-
-2. **Start the development environment:**
-   ```bash
-   # Start all services with Docker (recommended)
-   make dev
-   ```
-
-3. **Access the application:**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080
-   - Documentation: http://localhost:3001
-   - Health check: http://localhost:8080/health
-
-### Environment Configuration
-
-Copy the example environment file and configure as needed:
-
-```bash
-cp .env.example .env
+```sh
+npm ci
+npm run db:local -w @bugrelay/api
+npm run dev:api
+# In another terminal:
+npm run dev:web
 ```
 
-Key environment variables:
-- `DB_*`: Database connection settings
-- `REDIS_*`: Redis connection settings  
-- `JWT_SECRET`: JWT signing secret (change in production)
+Open `http://localhost:3000`. The API runs locally at port 8787. Wrangler simulates D1, R2 and email; it does not send real emails. Read verification/reset/claim mail through Wrangler Local Explorer at `http://localhost:8787/cdn-cgi/local/explorer` or its local email API. Only local/test environments bypass Turnstile.
 
-### Available Commands
+For a sandbox with an unwritable home directory, set `npm_config_cache`, `XDG_CONFIG_HOME` and `WRANGLER_LOG_PATH` to writable **local** directories. Do not change `HOME` or put credentials in the repository.
 
-```bash
-# Core Commands
-make dev                 # Start development environment with hot reload
-make prod                # Start production environment
-make stop                # Stop all services
-make clean               # Remove containers and volumes
-make logs                # View logs from all services
-make shell               # Access backend shell for debugging
+## Checks
 
-# Development Utilities
-make seed                # Seed database with sample data
-make migrate             # Run database migrations
-make test                # Run all tests
-make build               # Build production images
-
-# Documentation
-make docs                # Start documentation server
-make help                # Show all available commands
+```sh
+npm run type-check
+npm run lint
+npm run format:check
+npm test
+npm audit --omit=dev --audit-level=high
+npm run build
+npm run build:cloudflare
+npx playwright install chromium
+npm run test:e2e:cloudflare
 ```
 
-## Project Structure
+API integration tests execute inside workerd with local D1 and R2, not SQLite mocks. CI and `test:e2e:cloudflare` exercise the compiled OpenNext Worker and API service binding. For Next dev instead, use `npm run test:e2e -w bugrelay-frontend`. Browser tests use local simulated email and refuse non-local targets. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` may select an installed Chromium. `PLAYWRIGHT_REUSE_SERVER=1` uses already-running local servers.
 
-```
-bugrelay/
-├── frontend/                 # Next.js frontend application
-│   ├── src/
-│   │   ├── app/             # Next.js 13+ app directory
-│   │   ├── components/      # Reusable React components
-│   │   ├── lib/            # Utility functions
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── store/          # Zustand state management
-│   │   └── types/          # TypeScript type definitions
-│   ├── public/             # Static assets
-│   └── package.json
-├── backend/                 # Go backend application
-│   ├── internal/
-│   │   ├── config/         # Configuration management
-│   │   ├── database/       # Database connection and models
-│   │   ├── redis/          # Redis client setup
-│   │   ├── router/         # HTTP routing and middleware
-│   │   ├── handlers/       # HTTP request handlers
-│   │   ├── services/       # Business logic
-│   │   └── utils/          # Utility functions
-│   ├── migrations/         # Database migration files
-│   ├── go.mod
-│   └── main.go
-├── docs/                    # VitePress documentation
-│   ├── api/                # API reference documentation
-│   ├── authentication/     # Auth guides and examples
-│   ├── deployment/         # Setup and deployment guides
-│   ├── guides/             # Tutorials and how-tos
-│   ├── models/             # Data model documentation
-│   ├── mcp/                # AI integration (MCP) docs
-│   ├── scripts/            # Documentation generation scripts
-│   ├── .vitepress/         # VitePress configuration
-│   └── package.json
-├── docker-compose.yml      # Docker services configuration
-└── package.json           # Root package.json for scripts
-```
+## Product behavior
 
-## Development Workflow
+- Public reports can be submitted anonymously, subject to Turnstile and rate limits. An anonymous reporter cannot later edit, attach files, or manage the report as its owner.
+- A verified account is required for private/security reports, attachments, votes, comments and company management. Security reports are always private. Public author DTOs never expose email addresses.
+- Private readers are the reporter, platform administrators, and members of the **verified assigned company**. This applies to lists, search/duplicates, counts, details, comments, votes and attachment downloads.
+- New product names can be reported immediately. Company listings are created explicitly with a domain; a product name never grants ownership. Work-email confirmation creates a pending claim with no private access. An independent platform administrator verifies domain control and representative authority before granting the first company administrator role; approved team administrators can then invite verified accounts.
+- [Isolated staging](docs/staging.md) uses production-strength authentication, real Turnstile and private staging storage on one exact workers.dev hostname. OAuth is disabled and email defaults to off; no development bypass is permitted on public staging.
+- Company members can respond and update status; their dashboard includes resolution-time analytics. Reporters/admins can edit or remove reports. Report visibility is immutable, and private reports cannot be merged into a broader audience.
+- Email/password registration, one-time verification/recovery, revocable cookie sessions, optional Google/GitHub OAuth with explicit account linking, threaded discussions, comment moderation, merging and audit export are implemented. OAuth buttons appear only when that provider is configured; existing email accounts are not silently linked to an OAuth identity.
+- No fictitious WebSocket, metrics, notification-inbox or automatic retry behavior is advertised. Updates are fetched from the API. Transactional email handles account and company verification/recovery.
 
-1. **Database Changes**: Add migration files in `backend/migrations/`
-2. **API Development**: Add handlers in `backend/internal/handlers/`
-3. **Frontend Development**: Add components in `frontend/src/components/`
-4. **State Management**: Use Zustand stores in `frontend/src/store/`
-5. **Documentation**: Auto-generated from code, manual updates in `docs/`
+## Release
 
-### Documentation Updates
+See [deployment](docs/deployment.md), [security model](docs/security.md), [API contract](docs/api.md), and [migration validation](docs/validation.md), and [feature coverage and differences](docs/feature-coverage.md). CI builds and tests only. It never deploys, changes DNS or provisions resources. Vercel Git deployment is disabled in this branch.
 
-The documentation system automatically generates API references from your Go code:
-
-```bash
-# After making backend changes, regenerate docs
-cd docs
-npm run generate:all
-
-# Validate the generated documentation
-npm run validate
-
-# Preview changes locally
-npm run dev
-```
-
-## Features & Status
-
-### ✅ Production Ready
-- **📚 Documentation System**: Complete VitePress-based documentation with auto-generation
-- **🏗️ Development Environment**: Full Docker-based development setup
-- **📋 Project Structure**: Well-organized codebase with clear separation of concerns
-- **🔧 Build System**: Comprehensive Makefile and npm scripts for all operations
-- **📖 Guides & Examples**: Extensive documentation with working code examples
-- **🤖 AI Integration**: Model Context Protocol (MCP) support for AI systems
-- **🚀 Deployment Ready**: Docker and Kubernetes deployment configurations
-
-### 🔄 In Active Development
-- **🔐 Authentication System**: JWT and OAuth integration (Google, GitHub)
-- **🐛 Bug Management**: Core bug reporting and tracking functionality
-- **🏢 Company Features**: Organization verification and team management
-- **👥 User Management**: Registration, profiles, and permissions
-- **💬 Comments & Voting**: Community interaction features
-
-### 📋 Planned Features
-- **🔍 Advanced Search**: Full-text search with filters and sorting
-- **📧 Notifications**: Email and in-app notification system
-- **🔗 Webhooks**: Integration with external systems
-- **📊 Analytics**: Usage analytics and reporting dashboard
-- **📱 Mobile App**: Native mobile applications
-- **🌐 API Versioning**: Multiple API versions support
-- **🔒 Advanced Security**: Rate limiting, CAPTCHA, and abuse prevention
-
-## Migration Guide for Existing Developers
-
-If you've been working with the previous setup, here's what changed:
-
-### What's New
-- **Single Docker Compose file**: Replaced multiple `docker-compose.*.yml` files
-- **Unified environment**: Single `.env` file instead of separate backend/.env
-- **Simplified commands**: Use `make dev` instead of complex script combinations
-- **Profile-based deployment**: Development and production use the same compose file with different profiles
-
-### Migration Steps
-1. **Clean up old setup**: Run `make clean` to remove old containers
-2. **Update environment**: Copy `.env.example` to `.env` and configure
-3. **Use new commands**: 
-   - Old: `./scripts/dev-start.sh` → New: `make dev`
-   - Old: `./scripts/deploy-prod.sh` → New: `make prod`
-   - Old: `docker-compose -f docker-compose.dev.yml down` → New: `make stop`
-
-### Removed Files
-- `docker-compose.dev.yml` and `docker-compose.prod.yml` (consolidated into single file)
-- `scripts/dev-start.sh`, `scripts/dev-stop.sh`, `scripts/deploy-prod.sh`, `scripts/setup-dev.sh`
-- `backend/.env` (moved to root `.env`)
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for detailed information on:
-
-- **Development Setup**: Getting your environment ready
-- **Code Standards**: Style guides for Go, TypeScript, and documentation
-- **Pull Request Process**: How to submit changes
-- **Documentation**: How to update and test documentation
-- **Testing**: Running tests and validation
-
-### Quick Contribution Steps
-
-1. **Fork & Clone**: Fork the repo and clone your fork
-2. **Setup**: Run `make setup` to install all dependencies
-3. **Develop**: Make your changes following our style guides
-4. **Test**: Run `make test` to ensure everything works
-5. **Document**: Update documentation if needed
-6. **Submit**: Create a pull request with a clear description
-
-### Areas We Need Help With
-
-- 🐛 **Backend Development**: Go API development and testing
-- 🎨 **Frontend Development**: React/Next.js components and features
-- 📚 **Documentation**: Improving guides and adding examples
-- 🧪 **Testing**: Writing comprehensive tests
-- 🚀 **DevOps**: Improving deployment and CI/CD processes
-
-## Community & Support
-
-- **📖 Documentation**: Start with our [Quick Start Guide](docs/guides/quick-start.md)
-- **🐛 Bug Reports**: Use GitHub Issues with the bug template
-- **💡 Feature Requests**: Use GitHub Issues with the feature template
-- **❓ Questions**: Start a GitHub Discussion
-- **💬 Chat**: Join our Discord community (coming soon)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Built with ❤️ by the BugRelay team and contributors**
+Production resource creation, sender/zone verification, secret setup, deployment, DNS changes and first-admin provisioning require a separately approved release. A successful local build is not a production deployment.
