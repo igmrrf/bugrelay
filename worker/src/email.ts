@@ -7,6 +7,15 @@ export async function sendActionEmail(
   purpose: "verify" | "reset" | "claim",
   companyId?: string,
 ) {
+  // Never redirect another user's proof to the test mailbox. Disabled or
+  // unapproved destinations fail before creating a token or calling a binding.
+  if (
+    !env.EMAIL ||
+    (env.ENVIRONMENT === "staging" &&
+      (env.STAGING_EMAIL_ENABLED !== "true" ||
+        user.email !== env.STAGING_EMAIL_RECIPIENT))
+  )
+    fail(503, "EMAIL_UNAVAILABLE", "Email is unavailable for this account.");
   const token = randomToken();
   const tokenHash = await digest(token);
   const created = now();

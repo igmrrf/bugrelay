@@ -12,15 +12,15 @@
   },
   "scripts": {
     "type-check": "npm run type-check --workspaces --if-present",
-    "lint": "eslint worker packages frontend/src frontend/tests",
+    "lint": "eslint worker packages scripts frontend/src frontend/tests",
     "test": "npm run test -w @bugrelay/api && npm run test -w bugrelay-frontend && npm run test:config",
     "build": "npm run build -w @bugrelay/api && npm run build -w bugrelay-frontend",
     "build:cloudflare": "npm run build:cloudflare -w bugrelay-frontend",
     "dev:api": "npm run dev -w @bugrelay/api",
     "dev:web": "npm run dev -w bugrelay-frontend",
-    "format:check": "prettier --check worker/src worker/test packages/contracts/src frontend/src frontend/tests",
-    "format": "prettier --write worker/src worker/test packages/contracts/src frontend/src frontend/tests",
-    "test:config": "node --test scripts/check-production-config.test.mjs",
+    "format:check": "prettier --check worker/src worker/test packages/contracts/src scripts frontend/src frontend/tests",
+    "format": "prettier --write worker/src worker/test packages/contracts/src scripts frontend/src frontend/tests",
+    "test:config": "node --test scripts/check-production-config.test.mjs scripts/check-staging-config.test.mjs",
     "test:e2e:cloudflare": "PLAYWRIGHT_CLOUDFLARE=1 npm run test:e2e -w bugrelay-frontend"
   },
   "devDependencies": {

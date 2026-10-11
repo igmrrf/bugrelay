@@ -77,3 +77,4 @@ wrangler.production.jsonc
 legacy/**/node_modules/
 legacy/**/logs/
 config/*.production.jsonc
+config/*.staging.jsonc

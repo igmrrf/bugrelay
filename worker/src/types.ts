@@ -2,10 +2,12 @@ import type { Context } from "hono";
 export interface Env {
   DB: D1Database;
   ATTACHMENTS: R2Bucket;
-  EMAIL: SendEmail;
+  EMAIL?: SendEmail;
   APP_ORIGIN: string;
-  ENVIRONMENT: "development" | "test" | "production";
+  ENVIRONMENT: "development" | "test" | "production" | "staging";
   EMAIL_FROM: string;
+  STAGING_EMAIL_ENABLED?: "true" | "false";
+  STAGING_EMAIL_RECIPIENT?: string;
   TURNSTILE_SECRET?: string;
   TURNSTILE_SITE_KEY?: string;
   GOOGLE_CLIENT_ID?: string;

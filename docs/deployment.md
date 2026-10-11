@@ -59,7 +59,7 @@ These are documented commands, not an automated release pipeline. The last comma
 
 ## Staging and release gates
 
-Use separate D1/R2 resources and a separately approved staging hostname/sender strategy. The API currently deliberately pins production origin/sender to the approved values; review and explicitly configure an additional staging environment before provisioning it. Never point local browser fixtures at a real deployment.
+Use the explicit secure `staging` mode and isolated templates described in [the staging runbook](staging.md). Production remains pinned to `https://bugrelay.com`; staging accepts only its exact configured `bugrelay-web-staging.<account-subdomain>.workers.dev` origin with real Turnstile and production-strength cookies/authentication. Account/subdomain, fresh storage, secret/widget and optional test mailbox must be verified before any separately authorized deployment. Never deploy development/test mode or point local browser fixtures at a real deployment.
 
 Before launch, verify:
 

@@ -1,0 +1,27 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bugrelay-api-staging",
+  "main": "../worker/src/index.ts",
+  "account_id": "REPLACE_WITH_VERIFIED_ACCOUNT_ID",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": {"cpu_ms": 30000},
+  "observability": {"enabled": true, "logs": {"invocation_logs": false}},
+  "vars": {
+    "APP_ORIGIN": "https://bugrelay-web-staging.REPLACE_WITH_ACCOUNT_SUBDOMAIN.workers.dev",
+    "ENVIRONMENT": "staging",
+    "EMAIL_FROM": "notifications@bugrelay.com",
+    "TURNSTILE_SITE_KEY": "REPLACE_WITH_REAL_STAGING_SITE_KEY",
+    "STAGING_EMAIL_ENABLED": "false"
+    // After explicit mailbox approval, set enabled to "true" and add
+    // "STAGING_EMAIL_RECIPIENT": "REPLACE_WITH_APPROVED_TEST_MAILBOX".
+  },
+  "d1_databases": [{"binding":"DB","database_name":"bugrelay-staging","database_id":"REPLACE_WITH_FRESH_STAGING_D1_ID","migrations_dir":"../worker/migrations"}],
+  "r2_buckets": [{"binding":"ATTACHMENTS","bucket_name":"bugrelay-attachments-staging"}],
+  "send_email": [],
+  // Optional EMAIL binding, only after matching mailbox approval:
+  // {"name":"EMAIL","allowed_sender_addresses":["notifications@bugrelay.com"],"allowed_destination_addresses":["REPLACE_WITH_APPROVED_TEST_MAILBOX"]}
+  "triggers": {"crons":["17 3 * * *"]}
+}

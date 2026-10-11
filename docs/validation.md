@@ -10,12 +10,12 @@ Active draft: [PR #2](https://github.com/igmrrf/bugrelay/pull/2). Branch: `feat/
 | --- | --- |
 | Fresh locked install | `npm ci` passed on Node 24.19.0 / npm 11.9.0 |
 | TypeScript / ESLint / Prettier | Passed on API, contracts, frontend and test code |
-| API runtime tests | **79 passed**, ten suites inside workerd with actual local D1/R2 |
+| API runtime tests | **108 passed**, eleven suites inside workerd with actual local D1/R2 |
 | Frontend regression tests | **9 passed** |
-| Production configuration tests | **9 passed**; reject unresolved templates, unintended routes/previews/domain/account/sender/binding and plaintext secrets |
+| Deployment configuration tests | **46 passed**; reject unresolved templates, unintended routes/previews/domain/account/sender/binding and plaintext secrets |
 | Browser launch journeys | **3 passed** on Chromium against the **compiled OpenNext Worker + private API service binding**, with local D1/R2 and simulated email |
 | Production builds | API dry-run, Next.js **16.3.8**, OpenNext **1.20.9** passed |
-| Production-template dry runs | Both Worker bundles passed with explicitly fictitious local fixture IDs; no upload or deployment |
+| Deployment-template dry runs | Production bundles passed previously; staging API (email off/on) and web bundles passed with explicitly fictitious local fixture IDs; no upload or deployment |
 | Production dependency audit | **0 vulnerabilities** from `npm audit --omit=dev --json` |
 | D1 migrations | All seven migrations applied to clean local D1; no remote database accessed |
 | GitHub connectivity | Authenticated connector published the approved baseline with an exact tree match; PR #2 continues it on the requested branch name. PR #1 remains linked for its discussion |
@@ -42,6 +42,10 @@ API tests cover authorization before admin side effects; privacy in details, cou
 
 The initial published baseline (`531b320`) failed its remote browser company-status journey after its other gates passed. Investigation reproduced company selection being lost when session refresh caused company options to reload. The selection is now explicit React state; a regression holds the option reload pending and verifies the submitted company ID. The compiled browser journey also asserts company assignment/management before status updates. Final remote status is always the exact head’s [PR #2 checks](https://github.com/igmrrf/bugrelay/pull/2/checks).
 
+## Secure staging support
+
+An explicit staging mode shares production authentication, exact Origin/host checks, secure host cookies and real Turnstile validation. Twenty-nine staging runtime tests cover challenge/hostname/provider failures, signup/recovery/cookies, disabled OAuth, optional restricted email, and rejection of public development/test bypasses. Thirty-seven added staging configuration tests reject unresolved placeholders, mixed Worker/storage/service/environment values, wildcard origins, dummy sitekeys, public API/previews, secret vars and unrestricted email. With a supplied resolved production API configuration, preflight also rejects D1-ID collisions. Live resource identity/privacy, real widget keys and delivery remain operator gates; offline checks cannot certify them. See [staging runbook](staging.md).
+
 ## Release blockers and unrun checks
 
 1. **P0 — live configuration and staging unverified.** Parent/operator must verify account, zone, sender, exact resources/bindings, private bucket access, HTTPS cookies/Origin, Turnstile and delivered email. Production placeholders intentionally remain unresolved. No credentials, grants, resources, DNS or production data were changed.
@@ -56,3 +60,5 @@ Local evidence is outside Git at `/workspace/bugrelay-review-evidence/`: `fresh-
 Security follow-up evidence: `auth-race-before.log` (five regressions fail on the prior code), `company-claims-before.log` (three privacy regressions fail), and `security-{api-tests,types,lint,format-check,tests,build,opennext,browser}.log`. Current exact-head CI remains the authoritative publication check.
 
 Upgrade follow-up evidence: `upgrade-before.log` records the no-audit regression failing against the prior migration; `upgrade-tests.log` and `upgrade-types.log` record the repaired migration and current API/static checks. No remote migration or login was attempted.
+
+Staging-support evidence: `staging-{tests,runtime-tests,config-tests,checks,build,browser}.log` and `staging-{api-disabled,api-enabled,web}-dryrun.log`. No infrastructure, secrets, real email or deployment were created for staging support.

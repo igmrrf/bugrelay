@@ -9,6 +9,8 @@ import companies from "./companies";
 import admin from "./admin";
 import attachments from "./attachments";
 import type { AppEnv, Env } from "./types";
+import { isSecureEnvironment } from "@bugrelay/contracts";
+import { enforceEnvironment } from "./environment";
 export const app = new Hono<AppEnv>({ strict: false });
 app.use("*", async (c, next) => {
   c.set("requestId", id());
@@ -16,14 +18,7 @@ app.use("*", async (c, next) => {
   c.header("Cache-Control", "private, no-store");
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
-  if (
-    c.env.ENVIRONMENT === "production" &&
-    (c.env.APP_ORIGIN !== "https://bugrelay.com" ||
-      !c.env.TURNSTILE_SECRET ||
-      !c.env.TURNSTILE_SITE_KEY ||
-      c.env.EMAIL_FROM !== "notifications@bugrelay.com")
-  )
-    fail(503, "CONFIGURATION_REQUIRED", "Service configuration is incomplete.");
+  enforceEnvironment(c);
   if (
     !["GET", "HEAD", "OPTIONS"].includes(c.req.method) &&
     c.req.header("Origin") !== c.env.APP_ORIGIN
@@ -54,8 +49,9 @@ app.get("/api/v1/health", async (c) => {
 });
 app.get("/api/v1/config", (c) =>
   c.json({
-    turnstileSiteKey:
-      c.env.ENVIRONMENT === "production" ? c.env.TURNSTILE_SITE_KEY : null,
+    turnstileSiteKey: isSecureEnvironment(c.env.ENVIRONMENT)
+      ? c.env.TURNSTILE_SITE_KEY
+      : null,
     oauthProviders: [
       ...(c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET
         ? ["google"]

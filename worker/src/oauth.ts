@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { emailSchema } from "@bugrelay/contracts";
+import { emailSchema, isSecureEnvironment } from "@bugrelay/contracts";
 import { getCookie, setCookie } from "hono/cookie";
 import {
   audit,
@@ -21,6 +21,8 @@ import {
 import type { AppEnv, Ctx, Env, UserRow } from "./types";
 const oauth = new Hono<AppEnv>();
 function settings(env: Env, provider: string) {
+  if (env.ENVIRONMENT === "staging")
+    fail(404, "PROVIDER_UNAVAILABLE", "OAuth is disabled in staging.");
   if (provider === "google" && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
     return {
       provider,
@@ -42,7 +44,9 @@ function settings(env: Env, provider: string) {
   fail(404, "PROVIDER_UNAVAILABLE", "This sign-in provider is not configured.");
 }
 const stateCookie = (env: Env) =>
-  env.ENVIRONMENT === "production" ? "__Host-bugrelay_oauth" : "bugrelay_oauth";
+  isSecureEnvironment(env.ENVIRONMENT)
+    ? "__Host-bugrelay_oauth"
+    : "bugrelay_oauth";
 oauth.get("/accounts", async (c) => {
   const u = requireUser(c);
   const accounts = await rows<{ provider: string }>(

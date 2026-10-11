@@ -10,3 +10,5 @@ This records the architecture explicitly approved in the parent conversation; re
 - Attachments are small raster images in private R2, streamed only after fresh authorization. No public bucket URLs. Expired-token/session/rate-limit cleanup is scheduled; failed attachment writes are compensated.
 - Cloudflare Email Sending binding delivers verification/recovery/claims; no token-returning production endpoint. OAuth is explicitly configuration gated. Test doubles exist only in test environments.
 - No legacy data migration, Redis, Go server, Elasticsearch or Loki is required. Legacy source remains in Git history. Deployment remains manual and gated on verified resources, sender, Turnstile, backup/restore and end-to-end staging checks.
+
+Staging uses explicit ENVIRONMENT=staging with the production security paths, an exact account workers.dev origin, a private staging API service binding, fresh staging D1/private R2, disabled OAuth and optional tightly restricted email. The development/test bypass is loopback-only. See docs/staging.md; live resources and deployment remain separately authorized.

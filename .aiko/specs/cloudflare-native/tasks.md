@@ -7,7 +7,7 @@
 - [x] Company verification, membership, status management and analytics implementation.
 - [x] Admin moderation, merging, suspension, audit and exports implementation.
 - [x] Next/OpenNext integration and usable launch journeys; retain anonymous public reporting.
-- [x] Current type checks, lint, 79 API tests, 9 frontend tests and 9 configuration tests, and 3 local browser tests pass.
+- [x] Current type checks, lint, 108 API tests, 9 frontend tests and 46 configuration tests, and 3 local browser tests pass.
 - [x] Archive the old deployment/runtime, disable automatic deployment and add test/build CI.
 - [x] Final security/feature review and additional edge-case coverage; all four identified parity gaps implemented and covered.
 - [x] Final pinned OpenNext build, local service-binding runtime, dry runs, fresh install and complete validation.
@@ -23,3 +23,5 @@ See `docs/validation.md` for exact checks, evidence and remaining work. Do not r
 - [x] Replace automatic mailbox ownership with pending company claims and independent audited platform-administrator approval; revoke earlier email-only grants on upgrade.
 
 - [x] Make company-authority upgrade fail closed independently of legacy audit records, with missing-audit/dormant/ownerless regressions.
+
+- [x] Explicit secure staging mode, isolated placeholder configs, real Turnstile, disabled OAuth and optional one-recipient email; offline validation and operator runbook.

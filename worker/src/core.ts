@@ -2,6 +2,7 @@ import { HTTPException } from "hono/http-exception";
 import { getCookie, setCookie } from "hono/cookie";
 import type { z } from "zod";
 import type { User } from "@bugrelay/contracts";
+import { isSecureEnvironment } from "@bugrelay/contracts";
 import type { Ctx, Env, SessionRow, UserRow } from "./types";
 
 export const now = () => new Date().toISOString();
@@ -113,7 +114,7 @@ export function pageResult<T>(
   };
 }
 export const cookieName = (env: Env) =>
-  env.ENVIRONMENT === "production"
+  isSecureEnvironment(env.ENVIRONMENT)
     ? "__Host-bugrelay_session"
     : "bugrelay_session";
 export function setSessionCookie(c: Ctx, token: string, maxAge = 7 * 86400) {
@@ -242,24 +243,37 @@ export async function rateLimit(
   }
 }
 export async function challenge(c: Ctx, token?: string) {
-  if (c.env.ENVIRONMENT !== "production") return;
+  if (c.env.ENVIRONMENT === "development" || c.env.ENVIRONMENT === "test")
+    return;
   if (!c.env.TURNSTILE_SECRET || !token)
     fail(400, "CHALLENGE_REQUIRED", "Complete the verification challenge.");
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      body: new URLSearchParams({
-        secret: c.env.TURNSTILE_SECRET,
-        response: token,
-        remoteip: c.req.header("CF-Connecting-IP") ?? "",
-      }),
-    },
-  );
-  const result = (await response.json()) as {
-    success: boolean;
-    hostname?: string;
-  };
-  if (!result.success || result.hostname !== new URL(c.env.APP_ORIGIN).hostname)
+  if (token === "XXXX.DUMMY.TOKEN.XXXX")
+    fail(400, "CHALLENGE_FAILED", "Verification challenge failed.");
+  let result: { success?: unknown; hostname?: unknown };
+  try {
+    const response = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        body: new URLSearchParams({
+          secret: c.env.TURNSTILE_SECRET,
+          response: token,
+          remoteip: c.req.header("CF-Connecting-IP") ?? "",
+        }),
+      },
+    );
+    if (!response.ok) throw new Error("Challenge unavailable");
+    result = await response.json();
+  } catch {
+    fail(
+      503,
+      "CHALLENGE_UNAVAILABLE",
+      "Verification is unavailable. Please try again.",
+    );
+  }
+  if (
+    result?.success !== true ||
+    result.hostname !== new URL(c.env.APP_ORIGIN).hostname
+  )
     fail(400, "CHALLENGE_FAILED", "Verification challenge failed.");
 }

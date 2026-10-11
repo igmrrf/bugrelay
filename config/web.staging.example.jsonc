@@ -1,0 +1,17 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bugrelay-web-staging",
+  "main": "../frontend/.open-next/worker.js",
+  "account_id": "REPLACE_WITH_VERIFIED_ACCOUNT_ID",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ENVIRONMENT": "staging",
+    "APP_ORIGIN": "https://bugrelay-web-staging.REPLACE_WITH_ACCOUNT_SUBDOMAIN.workers.dev"
+  },
+  "assets": {"directory":"../frontend/.open-next/assets","binding":"ASSETS"},
+  "services": [{"binding":"API","service":"bugrelay-api-staging"}],
+  "observability": {"enabled":true,"logs":{"invocation_logs":false}}
+}

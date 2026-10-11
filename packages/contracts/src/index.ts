@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./deployment-policy.mjs";
 
 export const statusSchema = z.enum([
   "open",
