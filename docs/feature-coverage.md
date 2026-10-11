@@ -9,7 +9,7 @@ The native implementation was compared with `legacy/backend/internal/router/rout
 | Email verification and password recovery | Hashed, purpose-bound, expiring, single-use links; concurrent consumption, replay, password-change invalidation and email-failure tests |
 | OAuth provider/state/callback | Google/GitHub, browser-bound state and PKCE; malformed provider data, verified email, replay, expiry and collision tests. Explicit session-bound linking with password confirmation or recent provider sign-in is covered; live providers untested |
 | New application discovery / anonymous submissions | Product names can be new; anonymous public reports remain allowed, rate limited and challenged in production. Private reports and screenshots require a verified account |
-| Company auto-creation from arbitrary URLs | Explicit domain-based companies replace guessed ownership; email-domain claims must complete proof of control. A report can remain unassigned |
+| Company auto-creation from arbitrary URLs | Explicit domain-based companies replace guessed ownership; mailbox claims remain pending until independent platform-administrator approval of domain control and representative authority. A report can remain unassigned |
 | Reports, search, duplicates, filters, pagination | Public/own/company lists, status/tag/company filters, newest/vote sorting and duplicate search; private ACL applied before all counts/search/aggregates. Search/tag/sort browser-component regression |
 | Votes and comments | Idempotent votes; paginated threaded comments, safe deletion tombstones, editing/deletion and author permissions; concurrent votes, cross-report ID substitution and ownership tests |
 | Company team and status handling | Verified team claims, members/admins, settings, status and response comments, status counts, resolution timestamps and average resolution hours; claim/browser, revocation and last-active-admin tests |
@@ -30,7 +30,9 @@ The native implementation was compared with `legacy/backend/internal/router/rout
 
 - Status names are normalized to `open`, `acknowledged`, `in_progress`, `resolved`, `closed`; the old `reviewing`/`fixed`/`won't fix` names are not imported. There is no existing data migration.
 - Screenshots are PNG/JPEG/WebP, at most 5 MiB each and five per report. Anonymous attachments and public object links are intentionally unavailable.
-- Companies are explicit domain-based listings, not inferred ownership from arbitrary product URLs. Team membership and private-report access require verified claims.
+- Companies are explicit domain-based listings. Mailbox confirmation never grants team membership or private-report access; independent administrator approval is required.
 - Live notifications, outbound report-update subscriptions, a public metrics/log-ingestion service and marketing placeholder pages are not advertised as implemented. The old routes/mock UI were not evidence of a working production service.
 
 The four identified parity gaps in the initial draft are now implemented and covered by API and UI/browser regressions. Production provider/email/Turnstile behavior and operational readiness still require live staging verification.
+
+Security review follow-up: mailbox confirmation now creates a pending company claim. A separate platform administrator must independently check domain control/representative authority and record a decision through `/admin/company-claims`. Applicants see pending/rejected status; private reports and management remain inaccessible before approval. Migration 0007 removes earlier email-only grants and their delegated memberships pending reapproval. This replaces the draft’s unsafe automatic mailbox-to-company-admin grant.

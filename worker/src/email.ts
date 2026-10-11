@@ -34,13 +34,13 @@ export async function sendActionEmail(
       ? "Verify your BugRelay email"
       : purpose === "reset"
         ? "Reset your BugRelay password"
-        : "Verify your company on BugRelay";
+        : "Confirm your company claim email";
   try {
     await env.EMAIL.send({
       from: env.EMAIL_FROM,
       to: user.email,
       subject: action,
-      text: `${action}\n\n${link}\n\nThis link expires in one hour and can be used once. If you did not request it, ignore this message.`,
+      text: `${action}\n\n${link}\n\n${purpose === "claim" ? "This confirms your mailbox only. Company access requires administrator review of independent domain-control evidence.\n\n" : ""}This link expires in one hour and can be used once. If you did not request it, ignore this message.`,
     });
   } catch {
     await stmt(

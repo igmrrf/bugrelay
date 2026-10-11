@@ -238,8 +238,9 @@ test("private reports disappear from detail, list, counts, search, comments, vot
       .status,
   ).toBe(200);
 });
-test("company verification requires a delivered bound token and membership removal revokes access immediately", async () => {
+test("company verification requires mailbox proof and independent approval; membership removal revokes access immediately", async () => {
   const owner = await user(),
+    reviewer = await user("reviewer@example.com", true),
     claimer = await user("owner@acme.example"),
     member = await user("member@acme.example");
   const company = (await (
@@ -296,6 +297,32 @@ test("company verification requires a delivered bound token and membership remov
       )
     ).status,
   ).toBe(400);
+  expect(
+    (await request(`/bugs/${b.id}`, "GET", undefined, claimer.cookie)).status,
+  ).toBe(404);
+  const pending = (await (
+    await request(
+      `/companies/${company.id}/claim`,
+      "GET",
+      undefined,
+      claimer.cookie,
+    )
+  ).json()) as { claim: { id: string } };
+  expect(
+    (
+      await request(
+        `/admin/company-claims/${pending.claim.id}/review`,
+        "POST",
+        {
+          decision: "approved",
+          domainControlVerified: true,
+          evidence:
+            "Fixture: independent domain control and representative authority verified.",
+        },
+        reviewer.cookie,
+      )
+    ).status,
+  ).toBe(200);
   expect(
     (await request(`/bugs/${b.id}`, "GET", undefined, claimer.cookie)).status,
   ).toBe(200);

@@ -150,25 +150,40 @@ export async function loadSession(c: Ctx) {
   if (!s) return invalid();
   const u = await row<UserRow>(
     c.env,
-    "SELECT * FROM users WHERE id=? AND suspended=0",
+    "SELECT * FROM users WHERE id=? AND suspended=0 AND EXISTS(SELECT 1 FROM sessions WHERE id=? AND user_id=users.id AND expires_at>?)",
     s.user_id,
+    s.id,
+    now(),
   );
   if (u) {
     c.set("user", u);
     c.set("session", s);
   } else invalid();
 }
-export async function createSession(c: Ctx, userId: string) {
+export async function createSession(
+  c: Ctx,
+  verified: Pick<UserRow, "id" | "password_hash" | "auth_epoch">,
+) {
   const token = randomToken();
-  await stmt(
+  // Check and insert in one SQLite statement. A check followed by an INSERT
+  // would still permit reset/revocation while hashing the session token.
+  const inserted = await stmt(
     c.env,
-    "INSERT INTO sessions(id,token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?,?)",
+    "INSERT INTO sessions(id,token_hash,user_id,expires_at,created_at) SELECT ?,?,id,?,? FROM users WHERE id=? AND password_hash IS ? AND auth_epoch=? AND suspended=0 RETURNING id",
     id(),
     await digest(token),
-    userId,
     new Date(Date.now() + 7 * 86400000).toISOString(),
     now(),
-  ).run();
+    verified.id,
+    verified.password_hash,
+    verified.auth_epoch,
+  ).first();
+  if (!inserted)
+    fail(
+      401,
+      "INVALID_CREDENTIALS",
+      "Sign-in state changed. Please sign in again.",
+    );
   setSessionCookie(c, token);
 }
 export async function userDTO(env: Env, u: UserRow): Promise<User> {

@@ -344,10 +344,12 @@ oauth.get("/:provider/callback", async (c) => {
       "SELECT * FROM users WHERE id=?",
       userId,
     ))!;
+    // New-account issuance is bound to the initial account state.
+    user.auth_epoch = 0;
   }
   if (user.suspended)
     fail(403, "ACCOUNT_UNAVAILABLE", "This account is unavailable.");
-  await createSession(c, user.id);
+  await createSession(c, user);
   return c.redirect(`${c.env.APP_ORIGIN}/dashboard`);
 });
 export default oauth;

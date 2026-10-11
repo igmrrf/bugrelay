@@ -15,12 +15,14 @@ import {
 } from "./core";
 import { bugDTO, getBug } from "./bugs";
 import type { AppEnv } from "./types";
+import companyClaims from "./company-claims";
 const admin = new Hono<AppEnv>();
 // This guard terminates before dispatching any handler, including reads and exports.
 admin.use("*", async (c, next) => {
   requireAdmin(c);
   await next();
 });
+admin.route("/company-claims", companyClaims);
 admin.get("/stats", async (c) => {
   const values = await c.env.DB.batch<{ n: number }>(
     [

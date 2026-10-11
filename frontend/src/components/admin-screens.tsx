@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import type { Bug, Page } from "@bugrelay/contracts";
+import type { Bug, CompanyClaimReview, Page } from "@bugrelay/contracts";
 import { send } from "@/lib/api";
 import { RequireAuth, useSession } from "./session";
 import {
@@ -43,7 +43,7 @@ interface Audit {
 export function AdminScreen({
   tab = "overview",
 }: {
-  tab?: "overview" | "moderation" | "audit" | "duplicates";
+  tab?: "overview" | "moderation" | "audit" | "duplicates" | "claims";
 }) {
   const { user, refresh } = useSession(),
     allowed = !!user?.isAdmin,
@@ -51,6 +51,9 @@ export function AdminScreen({
     [query, setQuery] = useState(""),
     [search, setSearch] = useState(""),
     action = useAction();
+  const claims = useResource<Page<CompanyClaimReview>>(
+    allowed && tab === "claims" ? `/admin/company-claims?page=${page}` : null,
+  );
   const stats = useResource<Record<string, number>>(
       allowed && tab === "overview" ? "/admin/stats" : null,
     ),
@@ -88,7 +91,9 @@ export function AdminScreen({
               ? "Audit log"
               : tab === "duplicates"
                 ? "Merge duplicate reports"
-                : "Moderation queue"
+                : tab === "claims"
+                  ? "Company claims"
+                  : "Moderation queue"
         }
       />
       <nav className="toolbar">
@@ -96,8 +101,83 @@ export function AdminScreen({
         <Link href="/admin/moderation">Moderation</Link>
         <Link href="/admin/duplicates">Duplicates</Link>
         <Link href="/admin/audit">Audit log</Link>
+        <Link href="/admin/company-claims">Company claims</Link>
       </nav>
       <Feedback {...action} />
+      {tab === "claims" && (
+        <>
+          <p className="notice">
+            A matching email address proves mailbox access only. Before
+            approval, independently verify domain control and the applicant’s
+            authority using a domain administrator’s DNS or website challenge.
+            Record the evidence without secrets. Do not approve solely from
+            email or a public-email-provider classification. You cannot review
+            your own claim.
+          </p>
+          <Loading {...claims} />
+          <div className="stack">
+            {claims.data?.items.map((claim) => (
+              <form
+                className="card wide-form"
+                key={claim.id}
+                onSubmit={(event) => {
+                  const values = formValues(event);
+                  void action.run(async () => {
+                    const result = await send<{ message: string }>(
+                      `/admin/company-claims/${claim.id}/review`,
+                      {
+                        decision: String(values.get("decision")),
+                        evidence: String(values.get("evidence")),
+                        domainControlVerified:
+                          values.get("domainControlVerified") === "on",
+                      },
+                    );
+                    claims.reload();
+                    action.setMessage(result.message);
+                  });
+                }}
+              >
+                <h2>{claim.companyName}</h2>
+                <p>
+                  {claim.companyDomain} · {claim.email}
+                </p>
+                <Field label="Review decision">
+                  <select name="decision" defaultValue="rejected">
+                    <option value="rejected">Reject</option>
+                    <option value="approved">Approve</option>
+                  </select>
+                </Field>
+                <Field
+                  label="Review evidence"
+                  hint="Record the independent check, when it was performed, and who authorized the representative. Do not include secrets."
+                >
+                  <textarea
+                    name="evidence"
+                    required
+                    minLength={20}
+                    maxLength={2000}
+                  />
+                </Field>
+                <label>
+                  <input name="domainControlVerified" type="checkbox" /> I
+                  independently verified domain control and this applicant’s
+                  authority.
+                </label>
+                <button
+                  className="primary"
+                  disabled={action.busy || claim.userId === user?.id}
+                >
+                  Record review
+                </button>
+              </form>
+            ))}
+          </div>
+          {claims.data?.items.length === 0 && (
+            <p className="empty">No pending company claims.</p>
+          )}
+          {claims.data && <Pager data={claims.data} onPage={setPage} />}
+        </>
+      )}
       {tab === "overview" && (
         <>
           <Loading {...stats} />

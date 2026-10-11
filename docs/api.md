@@ -27,3 +27,7 @@ Discussion lists paginate root comments by default; `parentId` selects one comme
 OAuth linking starts with an Origin-protected POST from a verified session. Password accounts supply `currentPassword`; passwordless accounts require a session created in the last ten minutes. The returned provider URL carries a one-time intent bound to the browser and exact user/session. Callback rechecks live authorization after provider requests. Linking never changes the account email or reassigns an existing provider identity.
 
 Report DTOs include `resolvedAt`. `resolved`/`closed` preserve the first terminal timestamp until reopening. Company analytics returns `resolvedBugCount` and nullable `averageResolutionHours` for accessible nondeleted reports currently in a terminal state. This measures report age at resolution, not staff working time or a promised SLA.
+
+## Company authorization review
+
+`POST /companies/:id/claim` sends mailbox proof. `POST /companies/:id/verify` consumes that proof and returns `{ claim, message }` with `claim.status=pending`; it does not grant ownership. `GET /companies/:id/claim` returns only the signed-in applicant’s latest status. `GET /admin/company-claims` paginates pending requests for platform administrators. `POST /admin/company-claims/:id/review` accepts `decision` (`approved` or `rejected`), a 20–2000-character `evidence` record, and `domainControlVerified:true` for approval. Self review is rejected. The live reviewer/claimant checks, transition, membership grant and audit are atomic.

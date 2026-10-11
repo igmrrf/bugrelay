@@ -69,7 +69,7 @@ auth.post("/register", async (c) => {
     userId,
   ))!;
   // Registration survives a delivery outage; the signed-in user can resend.
-  await createSession(c, userId);
+  await createSession(c, { id: userId, password_hash: hash, auth_epoch: 0 });
   let emailSent = true;
   try {
     await sendActionEmail(c.env, u, "verify");
@@ -94,7 +94,7 @@ auth.post("/login", async (c) => {
   );
   if (!u || !u.password_hash || !matches || u.suspended)
     fail(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
-  await createSession(c, u.id);
+  await createSession(c, u);
   await audit(c.env, u.id, "login", "user", u.id).run();
   return c.json({ user: await userDTO(c.env, u) });
 });
@@ -156,7 +156,13 @@ auth.delete("/sessions/:id", async (c) => {
 });
 auth.post("/sessions/revoke-all", async (c) => {
   const u = requireUser(c, false);
-  await stmt(c.env, "DELETE FROM sessions WHERE user_id=?", u.id).run();
+  // The epoch trigger deletes current sessions in the same transaction and
+  // prevents already-running credential checks from creating replacements.
+  await stmt(
+    c.env,
+    "UPDATE users SET auth_epoch=auth_epoch+1 WHERE id=?",
+    u.id,
+  ).run();
   setSessionCookie(c, "", 0);
   return c.json({ message: "All sessions revoked." });
 });
@@ -313,11 +319,14 @@ auth.post("/change-password", async (c) => {
   const result = await c.env.DB.batch([
     stmt(
       c.env,
-      "UPDATE users SET password_hash=?,updated_at=? WHERE id=? AND password_hash=? RETURNING id",
+      "UPDATE users SET password_hash=?,updated_at=? WHERE id=? AND password_hash=? AND auth_epoch=? AND suspended=0 AND EXISTS(SELECT 1 FROM sessions WHERE id=? AND user_id=users.id AND expires_at>?) RETURNING id",
       hash,
       now(),
       u.id,
       u.password_hash,
+      u.auth_epoch,
+      c.get("session")!.id,
+      now(),
     ),
     stmt(
       c.env,

@@ -169,8 +169,9 @@ test("signup, verified submission, duplicate search, voting, comments, private a
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 });
-test("company email claim, status response and moderation are usable through the UI", async ({
+test("company claim requires independent review before status response and moderation journeys", async ({
   page,
+  browser,
 }) => {
   const unique = Date.now(),
     email = `team-${unique}@company${unique}.example`;
@@ -188,7 +189,9 @@ test("company email claim, status response and moderation are usable through the
     .click();
   await expect(page).toHaveURL(/\/companies\/[a-f0-9-]+$/);
   const companyURL = page.url();
-  await page.getByRole("link", { name: "Verify company", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Request company access", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Send work-email verification" })
     .click();
@@ -196,11 +199,61 @@ test("company email claim, status response and moderation are usable through the
     "verification link has been sent",
   );
   await page.goto(
-    await emailLink(page.request, email, "Verify your company on BugRelay"),
+    await emailLink(page.request, email, "Confirm your company claim email"),
   );
   await page
-    .getByRole("button", { name: "Confirm company verification" })
+    .getByRole("button", { name: "Confirm mailbox for review" })
     .click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "pending administrator review" }),
+  ).toContainText("pending administrator review");
+  const profile = await (await page.request.get("/api/v1/auth/profile")).json();
+  expect(profile.companyMemberships).toHaveLength(0);
+  const reviewerContext = await browser.newContext();
+  const reviewer = await reviewerContext.newPage();
+  const reviewerEmail = `reviewer-${unique}@example.test`;
+  await signup(reviewer, reviewerEmail, "Independent reviewer");
+  const confidential = await reviewer.request.post("/api/v1/bugs", {
+    headers: { Origin: "http://localhost:3000" },
+    data: {
+      title: "Private company review fixture",
+      description:
+        "Private report created before a company representative is approved.",
+      applicationName: "Review fixture",
+      companyId: companyURL.split("/").pop(),
+      category: "security",
+    },
+  });
+  expect(confidential.status()).toBe(201);
+  const privateId = (await confidential.json()).id;
+  expect((await page.request.get(`/api/v1/bugs/${privateId}`)).status()).toBe(
+    404,
+  );
+  await localSQL(
+    reviewer.request,
+    "UPDATE users SET is_admin=1 WHERE email=?",
+    [reviewerEmail],
+  );
+  await reviewer.goto("/admin/company-claims");
+  const claimCard = reviewer.locator("form").filter({ hasText: email });
+  await claimCard.getByLabel("Review decision").selectOption("approved");
+  await claimCard
+    .getByLabel("Review evidence")
+    .fill(
+      "Local fixture: independent DNS control and representative authority checked.",
+    );
+  await claimCard.getByRole("checkbox").check();
+  await claimCard.getByRole("button", { name: "Record review" }).click();
+  await expect(
+    reviewer.getByRole("status").filter({ hasText: "Company claim approved" }),
+  ).toContainText("Company claim approved");
+  expect((await page.request.get(`/api/v1/bugs/${privateId}`)).status()).toBe(
+    200,
+  );
+  await reviewerContext.close();
+  await page.reload();
   await expect(
     page.getByText(
       "This company is verified. Ask an administrator to add you to the team.",

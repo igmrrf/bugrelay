@@ -153,6 +153,19 @@ export interface CompanyMember {
   user: PublicUser & { email: string };
   addedAt: string;
 }
+export interface CompanyClaim {
+  id: string;
+  companyId: string;
+  status: "pending" | "approved" | "rejected";
+  mailboxVerifiedAt: string;
+  reviewedAt: string | null;
+}
+export interface CompanyClaimReview extends CompanyClaim {
+  userId: string;
+  email: string;
+  companyName: string;
+  companyDomain: string;
+}
 export interface Page<T> {
   items: T[];
   total: number;

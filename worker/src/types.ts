@@ -18,6 +18,7 @@ export interface UserRow {
   email: string;
   display_name: string;
   password_hash: string | null;
+  auth_epoch: number;
   is_admin: number;
   email_verified: number;
   suspended: number;

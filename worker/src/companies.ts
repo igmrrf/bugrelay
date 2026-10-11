@@ -130,7 +130,28 @@ companies.post("/:id/claim", async (c) => {
       "ALREADY_CLAIMED",
       "This company is already verified. Ask its administrator to invite you.",
     );
-  const domain = u.email.split("@")[1];
+  requireWorkMailbox(u, company.domain);
+  if (
+    await row(
+      c.env,
+      "SELECT id FROM company_claims WHERE company_id=? AND user_id=? AND status='pending'",
+      company.id,
+      u.id,
+    )
+  )
+    fail(
+      409,
+      "CLAIM_PENDING",
+      "Your mailbox is verified. Your company claim is awaiting administrator review.",
+    );
+  await sendActionEmail(c.env, u, "claim", company.id);
+  return c.json({
+    message: "A verification link has been sent to your work email.",
+  });
+});
+// This is a small abuse filter only. The administrator review below is the
+// authorization boundary even for public-mail domains missing from this list.
+function requireWorkMailbox(u: UserRow, domain: string) {
   const publicDomains = new Set([
     "gmail.com",
     "googlemail.com",
@@ -142,68 +163,89 @@ companies.post("/:id/claim", async (c) => {
     "proton.me",
     "protonmail.com",
     "aol.com",
+    "mail.com",
+    "email.com",
   ]);
-  if (domain !== company.domain || publicDomains.has(domain))
+  if (u.email.split("@")[1] !== domain || publicDomains.has(domain))
     fail(
       403,
       "DOMAIN_REQUIRED",
-      "Use a verified work email matching the company domain.",
+      "Use a verified work email matching the company domain. Public email accounts cannot establish company authority.",
     );
-  await sendActionEmail(c.env, u, "claim", company.id);
-  return c.json({
-    message: "A verification link has been sent to your work email.",
-  });
+}
+companies.get("/:id/claim", async (c) => {
+  const u = requireUser(c);
+  const claim = await row(
+    c.env,
+    "SELECT id,company_id AS companyId,status,mailbox_verified_at AS mailboxVerifiedAt,reviewed_at AS reviewedAt FROM company_claims WHERE company_id=? AND user_id=? ORDER BY mailbox_verified_at DESC,id DESC LIMIT 1",
+    c.req.param("id"),
+    u.id,
+  );
+  return c.json({ claim });
 });
 companies.post("/:id/verify", async (c) => {
   const u = requireUser(c);
   await rateLimit(c, "claim-verify", 10, 900, u.id);
   const company = await getCompany(c, c.req.param("id"));
+  requireWorkMailbox(u, company.domain);
   const v = await body(
     c,
     z.object({ token: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   );
   const hash = await digest(v.token),
-    time = now();
-  // Conditional statements share a transaction. The first successful claim wins.
-  const valid =
-    "SELECT 1 FROM action_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND t.purpose='claim' AND t.user_id=? AND t.company_id=? AND t.email=u.email AND u.email_verified=1 AND u.suspended=0 AND t.consumed_at IS NULL AND t.expires_at>?";
-  const args = [hash, u.id, company.id, time];
+    time = now(),
+    claimId = id();
+  // Mailbox proof only creates an inert review request. No membership or
+  // company verification is written here, even for an unknown public provider.
   const results = await c.env.DB.batch([
     stmt(
       c.env,
-      `INSERT INTO company_members(id,company_id,user_id,role,created_at) SELECT ?,?,?,'admin',? WHERE EXISTS(${valid}) AND EXISTS(SELECT 1 FROM companies WHERE id=? AND is_verified=0) ON CONFLICT(company_id,user_id) DO NOTHING RETURNING id`,
+      "INSERT INTO company_claims(id,company_id,user_id,email,mailbox_verified_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM action_tokens t JOIN users u ON u.id=t.user_id JOIN companies co ON co.id=t.company_id WHERE t.token_hash=? AND t.purpose='claim' AND t.user_id=? AND t.company_id=? AND t.email=u.email AND u.email_verified=1 AND u.suspended=0 AND t.consumed_at IS NULL AND t.expires_at>? AND co.is_verified=0 AND NOT EXISTS(SELECT 1 FROM company_members WHERE company_id=co.id)) ON CONFLICT DO NOTHING RETURNING id",
+      claimId,
+      company.id,
+      u.id,
+      u.email,
+      time,
+      hash,
+      u.id,
+      company.id,
+      time,
+    ),
+    stmt(
+      c.env,
+      "UPDATE action_tokens SET consumed_at=?,consumed_by=? WHERE token_hash=? AND EXISTS(SELECT 1 FROM company_claims WHERE id=?)",
+      time,
+      claimId,
+      hash,
+      claimId,
+    ),
+    stmt(
+      c.env,
+      "INSERT INTO audit_logs(id,actor_id,action,entity_type,entity_id,created_at) SELECT ?,?,'company_claim_submitted','company_claim',?,? WHERE EXISTS(SELECT 1 FROM company_claims WHERE id=?)",
       id(),
-      company.id,
       u.id,
+      claimId,
       time,
-      ...args,
-      company.id,
-    ),
-    stmt(
-      c.env,
-      `UPDATE companies SET is_verified=1,updated_at=? WHERE id=? AND is_verified=0 AND EXISTS(${valid}) AND EXISTS(SELECT 1 FROM company_members WHERE company_id=? AND user_id=? AND role='admin') RETURNING id`,
-      time,
-      company.id,
-      ...args,
-      company.id,
-      u.id,
-    ),
-    stmt(
-      c.env,
-      "UPDATE action_tokens SET consumed_at=? WHERE company_id=? AND purpose='claim' AND EXISTS(SELECT 1 FROM companies WHERE id=? AND is_verified=1)",
-      time,
-      company.id,
-      company.id,
+      claimId,
     ),
   ]);
-  if (!results[1].results.length)
+  if (!results[0].results.length)
     fail(
       400,
       "INVALID_TOKEN",
-      "This claim link is invalid, expired, or already used.",
+      "This claim link is invalid, expired, already used, or a claim is already pending.",
     );
-  await audit(c.env, u.id, "company_verified", "company", company.id).run();
-  return c.json(companyDTO(await getCompany(c, company.id)));
+  return c.json({
+    claim: {
+      id: claimId,
+      companyId: company.id,
+      status: "pending",
+      mailboxVerifiedAt: time,
+      reviewedAt: null,
+    },
+    message:
+      "Mailbox verified. Your company claim is pending administrator review. Private reports remain unavailable until approval.",
+  });
 });
 companies.get("/:id/members", async (c) => {
   const cid = c.req.param("id");

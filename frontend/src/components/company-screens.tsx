@@ -2,7 +2,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import type { Bug, Company, CompanyMember, Page } from "@bugrelay/contracts";
+import type {
+  Bug,
+  Company,
+  CompanyClaim,
+  CompanyMember,
+  Page,
+} from "@bugrelay/contracts";
 import { api, send } from "@/lib/api";
 import { RequireAuth, useSession } from "./session";
 import {
@@ -166,6 +172,9 @@ export function CompanyScreen({
   const token = useLinkToken(),
     action = useAction(),
     c = company.data;
+  const claim = useResource<{ claim: CompanyClaim | null }>(
+    tab === "claim" && user?.isEmailVerified ? `/companies/${id}/claim` : null,
+  );
   return (
     <>
       <Loading {...company} />
@@ -185,7 +194,7 @@ export function CompanyScreen({
             {admin && <Link href={`/companies/${id}/settings`}>Settings</Link>}
             {!c.isVerified && (
               <Link className="button small" href={`/companies/${id}/claim`}>
-                Verify company
+                Request company access
               </Link>
             )}
           </nav>
@@ -225,17 +234,26 @@ export function CompanyScreen({
           {tab === "claim" && (
             <RequireAuth>
               <div className="card wide-form">
-                <h2>Verify your company</h2>
+                <h2>Request company access</h2>
                 <p>
                   Use a verified work email at <strong>{c.domain}</strong>. A
-                  one-time email link establishes the first company
-                  administrator. Existing administrators can add team members
-                  after verification.
+                  one-time link confirms your mailbox. A platform administrator
+                  must independently verify your authority to represent the
+                  domain before approving access to private reports and team
+                  management. Mailbox verification alone grants no company
+                  access.
                 </p>
+                <Loading {...claim} />
                 {c.isVerified ? (
                   <p className="success">
                     This company is verified. Ask an administrator to add you to
                     the team.
+                  </p>
+                ) : claim.data?.claim?.status === "pending" ? (
+                  <p className="notice">
+                    Mailbox verified. Your company claim is pending
+                    administrator review. Private reports remain unavailable
+                    until approval.
                   </p>
                 ) : token ? (
                   <button
@@ -243,30 +261,43 @@ export function CompanyScreen({
                     disabled={action.busy}
                     onClick={() =>
                       void action.run(async () => {
-                        await send(`/companies/${id}/verify`, { token });
+                        const result = await send<{ message: string }>(
+                          `/companies/${id}/verify`,
+                          { token },
+                        );
                         await refresh();
                         company.reload();
-                        action.setMessage("Company verified.");
-                      })
-                    }
-                  >
-                    Confirm company verification
-                  </button>
-                ) : (
-                  <button
-                    className="primary"
-                    disabled={action.busy || !user?.isEmailVerified}
-                    onClick={() =>
-                      void action.run(async () => {
-                        const result = await send<{ message: string }>(
-                          `/companies/${id}/claim`,
-                        );
+                        claim.reload();
                         action.setMessage(result.message);
                       })
                     }
                   >
-                    Send work-email verification
+                    Confirm mailbox for review
                   </button>
+                ) : (
+                  <>
+                    {claim.data?.claim?.status === "rejected" && (
+                      <p className="notice">
+                        Your previous claim was not approved. Contact the
+                        platform operator to resolve the evidence needed, then
+                        submit a new request.
+                      </p>
+                    )}
+                    <button
+                      className="primary"
+                      disabled={action.busy || !user?.isEmailVerified}
+                      onClick={() =>
+                        void action.run(async () => {
+                          const result = await send<{ message: string }>(
+                            `/companies/${id}/claim`,
+                          );
+                          action.setMessage(result.message);
+                        })
+                      }
+                    >
+                      Send work-email verification
+                    </button>
+                  </>
                 )}
               </div>
             </RequireAuth>

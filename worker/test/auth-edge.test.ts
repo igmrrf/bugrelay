@@ -1,5 +1,4 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import bcrypt from "bcryptjs";
 import {
   bindings,
   bug,
@@ -204,13 +203,11 @@ test("concurrent verification and recovery accept exactly one token consumer", a
   ).toBe(0);
 });
 test("changing a password revokes old sessions and outstanding recovery links", async () => {
-  const u = await user();
-  await stmt(
-    bindings,
-    "UPDATE users SET password_hash=? WHERE id=?",
-    await bcrypt.hash("Original testing passphrase", 12),
-    u.id,
-  ).run();
+  const u = await user(
+    "reporter@example.com",
+    false,
+    "Original testing passphrase",
+  );
   await request("/auth/forgot-password", "POST", {
     email: "reporter@example.com",
   });

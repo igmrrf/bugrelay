@@ -4,7 +4,7 @@ No resource has been provisioned or deployed by this migration. The user supplie
 
 ## Secure access handoff
 
-Cloudflare authentication is owned by the parent/operator. A connected chat app does not automatically authenticate this shell. Do not extract connector credentials or paste tokens into chat. Use the operator's already-authorized Cloudflare CLI session, or a platform-supported secret injection path for an existing appropriately scoped API token. If a new authorization is necessary, the operator must approve and complete Wrangler's interactive login on their own trusted machine before work continues. Follow with read-only `wrangler whoami` and account/zone/resource inspection; do not combine setup with deployment. No new login/grant or credential was created here.
+Cloudflare authentication is owned by the parent/operator. A connected chat app does not automatically authenticate this shell. Do not extract connector credentials or paste tokens into chat. Use the operator's already-authorized Cloudflare CLI session, or a platform-supported secret injection path for an existing appropriately scoped API token. If a new authorization is necessary, the operator must approve and complete Wrangler's interactive login on their own trusted machine before work continues. Follow with read-only `wrangler whoami` and account/zone/resource inspection; do not combine setup with deployment. A later approved device sign-in attempt could not reach Cloudflare; no grant or credential was obtained.
 
 ### Smallest supported sign-in step for this cloud environment
 
@@ -15,7 +15,7 @@ npx wrangler login --device --browser=false --scopes account:read user:read zone
 npx wrangler whoami
 ```
 
-The user completes the short code at Cloudflare’s official device-authorization page in their own browser. No API token needs to be pasted into chat, no localhost port forwarding is required, and these scopes request no resource-write access. This is enough to establish identity/account/zone context, not to verify every D1/R2/Email setting or deploy. Broader inspection should use already-authorized read-only account access or a separately reviewed grant. Default unscoped Wrangler login requests all available scopes, so do not substitute it silently. These commands are documented only; no login was initiated here. Verified against installed Wrangler 4.149.0 help/scopes and [Cloudflare’s login documentation](https://developers.cloudflare.com/workers/wrangler/commands/general/#login).
+The user completes the short code at Cloudflare’s official device-authorization page in their own browser. No API token needs to be pasted into chat, no localhost port forwarding is required, and these scopes request no resource-write access. This is enough to establish identity/account/zone context, not to verify every D1/R2/Email setting or deploy. Broader inspection should use already-authorized read-only account access or a separately reviewed grant. Default unscoped Wrangler login requests all available scopes, so do not substitute it silently. The approved device attempt failed before any verification code was issued: the environment proxy returned HTTP 403 for dash.cloudflare.com. Installed Wrangler automatically appends offline_access (persistent refresh permission), even with the three explicitly named read scopes. Do not retry until network access is allowed and the user approves that additional permission; neither a code nor a token was obtained. Verified against installed Wrangler 4.149.0 help/scopes and [Cloudflare’s login documentation](https://developers.cloudflare.com/workers/wrangler/commands/general/#login).
 
 ## Exact intended resource changes (approval required)
 
@@ -65,7 +65,7 @@ Before launch, verify:
 
 - Signup and delivered verification mail, login/reload/logout, reset mail and replay/session revocation.
 - Turnstile success, failure and missing-token behavior; Origin/cookie flags over HTTPS.
-- Public and private report submission, company verification, membership removal, attachment denial, votes/comments/status updates, admin denial and moderation.
+- Public and private report submission, pending company claims, independent administrator approval/rejection, denied private access before approval, membership removal, attachment denial, votes/comments/status updates, admin denial and moderation.
 - Private R2 access is denied without the app, including old URLs after membership removal/deletion.
 - OAuth state/PKCE/callbacks and account collision behavior if providers are enabled.
 - Both Workers use the exact tested commit, correct binding names, no dev vars, and no unintended public API URL.
@@ -89,3 +89,9 @@ The daily cron deletes expired ephemeral records, soft-deleted reports older tha
 - [Workers runtime integration testing](https://developers.cloudflare.com/workers/testing/vitest-integration/)
 
 OpenNext is pinned to 1.20.9 because 1.20.10 brought a vulnerable transitive glob CLI into the build dependency tree at review time. Next.js is pinned to 16.3.8 because 16.4.0 bundled successfully but failed under workerd with an unsupported preview-props manifest. The pinned pair passes local service-binding runtime and browser tests. Recheck the lockfile/audit before a later release.
+
+## Company claim review procedure
+
+After the applicant verifies their mailbox, use `/admin/company-claims` from a separately authorized platform-administrator account. Verify domain control and the applicant’s authority independently: arrange a fresh, unpredictable DNS TXT or website challenge with the domain administrator, verify the result through trusted DNS/HTTPS tooling, and document the check time, method and representative authorization. Do not follow arbitrary claimant-supplied URLs blindly, store secrets in evidence, or accept matching mailboxes/public-provider classification as proof of authority. Approve only after that independent check; otherwise reject with a reason. Applicant status is visible on the company access page. The operator’s approval is the authorization boundary; DNS proof is not automated in this release.
+
+If upgrading an earlier native draft, migration 0007 intentionally disables companies with recorded email-only grants and removes their delegated memberships. Review the generated pending claims and re-invite legitimate members after approval. No existing grants are assumed independently vetted. Fresh deployments have no such records.

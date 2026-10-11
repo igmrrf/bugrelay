@@ -260,14 +260,11 @@ test("linking requires explicit verified authentication, password proof and a st
       )
     ).status,
   ).toBe(401);
-  const u = await user("password@example.com");
-  const bcrypt = await import("bcryptjs");
-  await stmt(
-    bindings,
-    "UPDATE users SET password_hash=? WHERE id=?",
-    await bcrypt.default.hash("A strong current password", 12),
-    u.id,
-  ).run();
+  const u = await user(
+    "password@example.com",
+    false,
+    "A strong current password",
+  );
   expect(
     (
       await request(

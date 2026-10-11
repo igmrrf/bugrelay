@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations, reset } from "cloudflare:test";
 import { expect, vi } from "vitest";
+import bcrypt from "bcryptjs";
 import type { D1Migration } from "@cloudflare/vitest-plugin";
 import { app } from "../src/index";
 import { digest, id, now, randomToken, stmt } from "../src/core";
@@ -52,17 +53,22 @@ export async function request(
     environment,
   );
 }
-export async function user(email = "reporter@example.com", admin = false) {
+export async function user(
+  email = "reporter@example.com",
+  admin = false,
+  password?: string,
+) {
   const uid = id(),
     token = randomToken(),
     time = now();
   await stmt(
     bindings,
-    "INSERT INTO users(id,email,display_name,is_admin,email_verified,created_at,updated_at) VALUES(?,?,?,?,1,?,?)",
+    "INSERT INTO users(id,email,display_name,is_admin,email_verified,password_hash,created_at,updated_at) VALUES(?,?,?,?,1,?,?,?)",
     uid,
     email,
     email.split("@")[0],
     Number(admin),
+    password ? await bcrypt.hash(password, 12) : null,
     time,
     time,
   ).run();
