@@ -1,49 +1,38 @@
 {
   "name": "bugrelay-frontend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare preview",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug",
-    "playwright:install": "playwright install"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
-    "@tanstack/react-query": "^5.90.12",
-    "axios": "^1.13.2",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
+    "@bugrelay/contracts": "*",
+    "@opennextjs/cloudflare": "1.20.9",
     "lucide-react": "^0.556.0",
-    "next": "^16.0.7",
-    "next-themes": "^0.4.6",
+    "next": "16.3.8",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^4.1.18",
-    "postcss": "^8.5.6",
-    "zustand": "^5.0.9"
+    "react-dom": "^19.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "jest": "^30.2.0",
-    "jest-environment-jsdom": "^30.2.0",
-    "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.9.3"
-  }
+    "@vitejs/plugin-react": "6.1.2",
+    "jsdom": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  },
+  "type": "module"
 }

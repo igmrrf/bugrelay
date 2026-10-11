@@ -1,0 +1,8 @@
+-- Run only after approval, against the correct fresh database, for the exact
+-- registered and email-verified operator account. No default admin is created.
+-- Replace the UUID after looking up and independently verifying the operator.
+UPDATE users SET is_admin=1
+WHERE id='REPLACE_WITH_VERIFIED_OPERATOR_USER_ID'
+  AND email_verified=1 AND suspended=0
+  AND NOT EXISTS(SELECT 1 FROM users WHERE is_admin=1);
+-- Confirm exactly one intended row changed. Subsequent promotions use /admin.

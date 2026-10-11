@@ -1,0 +1,16 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bugrelay-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": {"cpu_ms": 30000},
+  "observability": {"enabled": true},
+  "vars": {"APP_ORIGIN": "http://localhost:3000", "ENVIRONMENT": "development", "EMAIL_FROM": "notifications@bugrelay.com"},
+  "d1_databases": [{"binding":"DB","database_name":"bugrelay-local","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"migrations"}],
+  "r2_buckets": [{"binding":"ATTACHMENTS","bucket_name":"bugrelay-attachments-local"}],
+  "send_email": [{"name":"EMAIL","allowed_sender_addresses":["notifications@bugrelay.com"]}],
+  "triggers": {"crons":["17 3 * * *"]}
+}

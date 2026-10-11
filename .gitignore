@@ -62,3 +62,18 @@ docker-compose.override.yml
 # Air (Go hot reload)
 /backend/tmp/
 /backend/build-errors.log
+# Cloudflare native development
+node_modules/
+.wrangler/
+.open-next/
+.dev.vars*
+!.dev.vars.example
+worker/dist/
+coverage/
+playwright-report/
+test-results/
+wrangler.production.jsonc
+**/*.tsbuildinfo
+legacy/**/node_modules/
+legacy/**/logs/
+config/*.production.jsonc

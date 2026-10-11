@@ -1,0 +1,12 @@
+{
+ "$schema":"../node_modules/wrangler/config-schema.json",
+ "name":"bugrelay-web",
+ "main":".open-next/worker.js",
+ "compatibility_date":"2026-10-11",
+ "compatibility_flags":["nodejs_compat","global_fetch_strictly_public"],
+ "workers_dev":false,
+ "preview_urls":false,
+ "assets":{"directory":".open-next/assets","binding":"ASSETS"},
+ "services":[{"binding":"API","service":"bugrelay-api"}],
+ "observability":{"enabled":true}
+}

@@ -1,0 +1,33 @@
+{
+  "name": "bugrelay",
+  "version": "0.2.0",
+  "private": true,
+  "workspaces": [
+    "packages/contracts",
+    "worker",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "type-check": "npm run type-check --workspaces --if-present",
+    "lint": "eslint worker packages frontend/src frontend/tests",
+    "test": "npm run test -w @bugrelay/api && npm run test -w bugrelay-frontend && npm run test:config",
+    "build": "npm run build -w @bugrelay/api && npm run build -w bugrelay-frontend",
+    "build:cloudflare": "npm run build:cloudflare -w bugrelay-frontend",
+    "dev:api": "npm run dev -w @bugrelay/api",
+    "dev:web": "npm run dev -w bugrelay-frontend",
+    "format:check": "prettier --check worker/src worker/test packages/contracts/src frontend/src frontend/tests",
+    "format": "prettier --write worker/src worker/test packages/contracts/src frontend/src frontend/tests",
+    "test:config": "node --test scripts/check-production-config.test.mjs",
+    "test:e2e:cloudflare": "PLAYWRIGHT_CLOUDFLARE=1 npm run test:e2e -w bugrelay-frontend"
+  },
+  "devDependencies": {
+    "comment-json": "4.5.1",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}
