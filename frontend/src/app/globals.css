@@ -472,3 +472,17 @@ footer {
     transition: background-color 0.15s;
   }
 }
+
+.replies {
+  margin-top: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.comment {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .replies {
+    padding-left: 6px;
+  }
+}

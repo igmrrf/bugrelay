@@ -27,3 +27,9 @@ Deleted reports immediately disappear from every application read. Daily cleanup
 Structured application failures log only an event, request ID and method. Audit records contain actor/action/entity IDs and time, not request bodies or report content. Production templates disable invocation logs because OAuth callbacks contain authorization codes in query strings; do not enable full URL/header/body logging without redaction. No Elasticsearch/Loki/Grafana public deployment is part of this architecture.
 
 Turnstile is mandatory for production signup/login/recovery/report submission. D1 rate counters are atomic and scoped independently by action and identity/IP hash. Public browsing does not consume the report-submission quota. Platform edge abuse rules and budget alarms should be reviewed during release.
+
+## Linking, threads and resolution analytics
+
+OAuth linking is an explicit authenticated mutation. Password proof (or recent provider authentication for passwordless accounts), verified provider identity, browser/state/PKCE, exact-session binding, and unique identity ownership prevent login CSRF and email-based account merging. Revocation/suspension during the provider round trip is rechecked before insertion.
+
+Thread and comment-flag endpoints first authorize the containing report and validate that every parent/target belongs to it. Deleting a parent hides its content and retains authorized access to descendants. Comment moderation deletes only its target. Company resolution aggregates reuse the report visibility predicate and exclude deleted reports.

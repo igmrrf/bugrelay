@@ -45,6 +45,7 @@ export interface BugRow {
   updated_at: string;
   vote_count: number;
   comment_count: number;
+  resolved_at: string | null;
   has_voted: number;
 }
 export const bugSelect = `SELECT b.*,a.name AS application_name,c.name AS company_name,u.display_name AS author_name,(SELECT count(*) FROM votes v WHERE v.bug_id=b.id) AS vote_count,(SELECT count(*) FROM comments cm WHERE cm.bug_id=b.id AND cm.deleted_at IS NULL) AS comment_count FROM bugs b JOIN applications a ON a.id=b.application_id LEFT JOIN companies c ON c.id=b.company_id LEFT JOIN users u ON u.id=b.author_id`;
@@ -138,6 +139,7 @@ export async function bugDTO(c: Ctx, b: BugRow): Promise<Bug> {
       : null,
     createdAt: b.created_at,
     updatedAt: b.updated_at,
+    resolvedAt: b.resolved_at,
     attachments: attachments.map((a) => ({
       id: a.id,
       name: a.name,
@@ -392,7 +394,9 @@ bugs.patch("/:id/status", async (c) => {
   const operations = [
     stmt(
       c.env,
-      "UPDATE bugs SET status=?,updated_at=? WHERE id=?",
+      "UPDATE bugs SET status=?,updated_at=?,resolved_at=CASE WHEN ? IN ('resolved','closed') THEN COALESCE(resolved_at,?) ELSE NULL END WHERE id=?",
+      v.status,
+      time,
       v.status,
       time,
       b.id,
@@ -453,50 +457,103 @@ interface CommentRow {
   content: string;
   created_at: string;
   updated_at: string;
+  parent_id: string | null;
+  depth: number;
+  reply_count: number;
+  deleted_at: string | null;
 }
+const visibleComment = (alias: string) =>
+  `(${alias}.deleted_at IS NULL OR EXISTS(SELECT 1 FROM comments child WHERE child.parent_id=${alias}.id))`;
+const commentSelect = `SELECT cm.*,u.display_name,(SELECT count(*) FROM comments reply WHERE reply.parent_id=cm.id AND ${visibleComment("reply")}) AS reply_count FROM comments cm JOIN users u ON u.id=cm.author_id`;
 const commentDTO = (c: Ctx, v: CommentRow): Comment => ({
   id: v.id,
   bugId: v.bug_id,
-  content: v.content,
-  author: { id: v.author_id, displayName: v.display_name },
+  content: v.deleted_at ? "[Deleted comment]" : v.content,
+  author: {
+    id: v.deleted_at ? "" : v.author_id,
+    displayName: v.deleted_at ? "Removed" : v.display_name,
+  },
   createdAt: v.created_at,
   updatedAt: v.updated_at,
-  canEdit: c.get("user")?.id === v.author_id || !!c.get("user")?.is_admin,
+  canEdit:
+    !v.deleted_at &&
+    (c.get("user")?.id === v.author_id || !!c.get("user")?.is_admin),
+  parentId: v.parent_id,
+  depth: v.depth,
+  replyCount: v.reply_count,
+  isDeleted: !!v.deleted_at,
 });
 bugs.get("/:id/comments", async (c) => {
-  const b = await getBug(c, c.req.param("id"));
-  const p = pagination(c);
+  const b = await getBug(c, c.req.param("id")),
+    p = pagination(c);
+  const parent = c.req.query("parentId") || null;
+  if (
+    parent &&
+    !(await row(
+      c.env,
+      "SELECT id FROM comments WHERE id=? AND bug_id=?",
+      parent,
+      b.id,
+    ))
+  )
+    fail(404, "NOT_FOUND", "Comment not found.");
+  const condition = `cm.bug_id=? AND cm.parent_id IS ? AND ${visibleComment("cm")}`;
   const items = await rows<CommentRow>(
     c.env,
-    "SELECT cm.*,u.display_name FROM comments cm JOIN users u ON u.id=cm.author_id WHERE bug_id=? AND deleted_at IS NULL ORDER BY created_at,id LIMIT ? OFFSET ?",
+    `${commentSelect} WHERE ${condition} ORDER BY cm.created_at,cm.id LIMIT ? OFFSET ?`,
     b.id,
+    parent,
     p.limit,
     p.offset,
+  );
+  const count = await row<{ n: number }>(
+    c.env,
+    `SELECT count(*) n FROM comments cm WHERE ${condition}`,
+    b.id,
+    parent,
   );
   return c.json(
     pageResult(
       items.map((v) => commentDTO(c, v)),
-      b.comment_count,
+      count!.n,
       p,
     ),
   );
 });
-bugs.post("/:id/comments", async (c) => {
-  const u = requireUser(c);
-  const b = await getBug(c, c.req.param("id"));
+async function createComment(c: Ctx, parentId: string | null) {
+  const u = requireUser(c),
+    b = await getBug(c, c.req.param("id")!);
   await rateLimit(c, "comment", 30, 3600, u.id);
   const v = await body(c, commentInputSchema);
+  const parent = parentId
+    ? await row<CommentRow>(
+        c.env,
+        "SELECT * FROM comments WHERE id=? AND bug_id=? AND deleted_at IS NULL",
+        parentId,
+        b.id,
+      )
+    : null;
+  if (parentId && !parent) fail(404, "NOT_FOUND", "Comment not found.");
+  if (parent && parent.depth >= 5)
+    fail(
+      400,
+      "THREAD_DEPTH",
+      "Start a new discussion after five reply levels.",
+    );
   const cid = id(),
-    time = now();
+    time = now(),
+    depth = parent ? parent.depth + 1 : 0;
   await stmt(
     c.env,
-    "INSERT INTO comments(id,bug_id,author_id,content,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+    "INSERT INTO comments(id,bug_id,author_id,content,created_at,updated_at,parent_id,depth) VALUES(?,?,?,?,?,?,?,?)",
     cid,
     b.id,
     u.id,
     v.content,
     time,
     time,
+    parentId,
+    depth,
   ).run();
   return c.json(
     commentDTO(c, {
@@ -507,9 +564,44 @@ bugs.post("/:id/comments", async (c) => {
       content: v.content,
       created_at: time,
       updated_at: time,
+      parent_id: parentId,
+      depth,
+      reply_count: 0,
+      deleted_at: null,
     }),
     201,
   );
+}
+bugs.post("/:id/comments", (c) => createComment(c, null));
+bugs.post("/:id/comments/:commentId/replies", (c) =>
+  createComment(c, c.req.param("commentId")),
+);
+bugs.post("/:id/comments/:commentId/report", async (c) => {
+  const u = requireUser(c),
+    b = await getBug(c, c.req.param("id"));
+  const cm = await row(
+    c.env,
+    "SELECT id FROM comments WHERE id=? AND bug_id=? AND deleted_at IS NULL",
+    c.req.param("commentId"),
+    b.id,
+  );
+  if (!cm) fail(404, "NOT_FOUND", "Comment not found.");
+  await rateLimit(c, "report", 10, 3600, u.id);
+  const v = await body(
+    c,
+    z.object({ reason: z.string().trim().min(5).max(1000) }).strict(),
+  );
+  await stmt(
+    c.env,
+    "INSERT INTO moderation(id,bug_id,comment_id,reporter_id,reason,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+    id(),
+    b.id,
+    c.req.param("commentId"),
+    u.id,
+    v.reason,
+    now(),
+  ).run();
+  return c.json({ message: "Comment sent for moderation." });
 });
 for (const method of ["patch", "delete"] as const)
   bugs[method]("/:id/comments/:commentId", async (c) => {
@@ -517,7 +609,7 @@ for (const method of ["patch", "delete"] as const)
     const b = await getBug(c, c.req.param("id"));
     const cm = await row<CommentRow>(
       c.env,
-      "SELECT cm.*,u.display_name FROM comments cm JOIN users u ON u.id=cm.author_id WHERE cm.id=? AND cm.bug_id=? AND cm.deleted_at IS NULL",
+      `${commentSelect} WHERE cm.id=? AND cm.bug_id=? AND cm.deleted_at IS NULL`,
       c.req.param("commentId"),
       b.id,
     );
@@ -555,7 +647,7 @@ bugs.post("/:id/report", async (c) => {
   );
   await stmt(
     c.env,
-    "INSERT INTO moderation(id,bug_id,reporter_id,reason,created_at) VALUES(?,?,?,?,?) ON CONFLICT(bug_id,reporter_id) DO NOTHING",
+    "INSERT INTO moderation(id,bug_id,reporter_id,reason,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
     id(),
     b.id,
     u.id,

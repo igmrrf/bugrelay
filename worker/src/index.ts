@@ -115,6 +115,17 @@ app.onError((error, c) => {
       },
       409,
     );
+  if (String(error).includes("INVALID_COMMENT_PARENT"))
+    return c.json(
+      {
+        error: {
+          code: "COMMENT_CHANGED",
+          message: "The parent comment changed. Refresh and try again.",
+          requestId: c.get("requestId"),
+        },
+      },
+      409,
+    );
   if (String(error).includes("UNIQUE constraint"))
     return c.json(
       {

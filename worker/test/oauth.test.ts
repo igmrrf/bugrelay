@@ -229,3 +229,357 @@ test("GitHub success uses verified primary email; a suspended linked user cannot
     await stmt(bindings, "SELECT count(*) n FROM sessions").first("n"),
   ).toBe(0);
 });
+async function linkStart(
+  cookie: string,
+  provider = "google",
+  currentPassword?: string,
+) {
+  const response = await request(
+    `/auth/oauth/${provider}/link`,
+    "POST",
+    currentPassword ? { currentPassword } : {},
+    cookie,
+    credentials,
+  );
+  expect(response.status).toBe(200);
+  const url = new URL(((await response.json()) as { url: string }).url);
+  return {
+    state: url.searchParams.get("state")!,
+    cookie: `${cookie}; ${response.headers.get("set-cookie")!.split(";")[0]}`,
+  };
+}
+test("linking requires explicit verified authentication, password proof and a strict body", async () => {
+  expect(
+    (
+      await request(
+        "/auth/oauth/google/link",
+        "POST",
+        {},
+        undefined,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  const u = await user("password@example.com");
+  const bcrypt = await import("bcryptjs");
+  await stmt(
+    bindings,
+    "UPDATE users SET password_hash=? WHERE id=?",
+    await bcrypt.default.hash("A strong current password", 12),
+    u.id,
+  ).run();
+  expect(
+    (
+      await request(
+        "/auth/oauth/google/link",
+        "POST",
+        {},
+        u.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await request(
+        "/auth/oauth/google/link",
+        "POST",
+        { currentPassword: "wrong" },
+        u.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await request(
+        "/auth/oauth/google/link",
+        "POST",
+        { currentPassword: "A strong current password", userId: "injected" },
+        u.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(400);
+  const flow = await linkStart(u.cookie, "google", "A strong current password");
+  providerMock("different-verified@example.com");
+  const response = await request(
+    `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+    "GET",
+    undefined,
+    flow.cookie,
+    credentials,
+  );
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe(
+    "http://localhost:3000/profile",
+  );
+  expect(
+    await stmt(bindings, "SELECT user_id FROM oauth_accounts").first("user_id"),
+  ).toBe(u.id);
+  expect(
+    await stmt(bindings, "SELECT email FROM users WHERE id=?", u.id).first(
+      "email",
+    ),
+  ).toBe("password@example.com");
+  expect(await stmt(bindings, "SELECT count(*) n FROM users").first("n")).toBe(
+    1,
+  );
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM sessions").first("n"),
+  ).toBe(1);
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(400);
+});
+test("link intent is bound to the original live session and cannot link to a different signed-in user", async () => {
+  const u = await user(),
+    other = await user("other@example.com"),
+    flow = await linkStart(u.cookie),
+    fetch = providerMock();
+  const wrong = flow.cookie.replace(u.cookie, other.cookie);
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        wrong,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM oauth_accounts").first("n"),
+  ).toBe(0);
+  const revoked = await linkStart(u.cookie);
+  await stmt(bindings, "DELETE FROM sessions WHERE id=?", u.sessionId).run();
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${revoked.state}&code=code`,
+        "GET",
+        undefined,
+        revoked.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(400);
+  expect(fetch).not.toHaveBeenCalled();
+});
+test("provider identity already owned by another user cannot be reassigned, even with the same verified email", async () => {
+  const owner = await user(),
+    other = await user("other@example.com");
+  await stmt(
+    bindings,
+    "INSERT INTO oauth_accounts(provider,subject,user_id) VALUES('google','google-subject',?)",
+    owner.id,
+  ).run();
+  const flow = await linkStart(other.cookie);
+  providerMock("other@example.com");
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    await stmt(
+      bindings,
+      "SELECT user_id FROM oauth_accounts WHERE provider='google'",
+    ).first("user_id"),
+  ).toBe(owner.id);
+});
+test("linking rejects unverified provider identity and suspension during the provider request", async () => {
+  const u = await user();
+  let flow = await linkStart(u.cookie);
+  providerMock("user@example.com", false);
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(400);
+  vi.restoreAllMocks();
+  flow = await linkStart(u.cookie);
+  const fetch = providerMock();
+  const original = fetch.getMockImplementation()!;
+  fetch.mockImplementation(async (input, init) => {
+    const response = await original(input, init);
+    if (String(input).includes("/userinfo"))
+      await stmt(
+        bindings,
+        "UPDATE users SET suspended=1 WHERE id=?",
+        u.id,
+      ).run();
+    return response;
+  });
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM oauth_accounts").first("n"),
+  ).toBe(0);
+});
+test("passwordless accounts need recent authentication; unverified users cannot start linking", async () => {
+  const u = await user();
+  await stmt(
+    bindings,
+    "UPDATE sessions SET created_at=? WHERE id=?",
+    new Date(Date.now() - 11 * 60000).toISOString(),
+    u.sessionId,
+  ).run();
+  expect(
+    (
+      await request(
+        "/auth/oauth/github/link",
+        "POST",
+        {},
+        u.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(401);
+  await stmt(
+    bindings,
+    "UPDATE users SET email_verified=0 WHERE id=?",
+    u.id,
+  ).run();
+  expect(
+    (
+      await request(
+        "/auth/oauth/github/link",
+        "POST",
+        {},
+        u.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM oauth_states").first("n"),
+  ).toBe(0);
+});
+test("linked provider sign-in resolves the explicit account and provider links do not expose identity details", async () => {
+  const u = await user(),
+    flow = await linkStart(u.cookie, "github");
+  providerMock("other-verified@example.com");
+  expect(
+    (
+      await request(
+        `/auth/oauth/github/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(302);
+  expect(
+    await (
+      await request("/auth/oauth/accounts", "GET", undefined, u.cookie)
+    ).json(),
+  ).toEqual({ accounts: [{ provider: "github" }], hasPassword: false });
+  const login = await start("github");
+  expect(
+    (
+      await request(
+        `/auth/oauth/github/callback?state=${login.state}&code=code`,
+        "GET",
+        undefined,
+        login.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(302);
+  expect(await stmt(bindings, "SELECT count(*) n FROM users").first("n")).toBe(
+    1,
+  );
+  expect(
+    await stmt(
+      bindings,
+      "SELECT count(*) n FROM sessions WHERE user_id=?",
+      u.id,
+    ).first("n"),
+  ).toBe(2);
+});
+test("concurrent explicit link attempts cannot assign one provider identity to two users", async () => {
+  const a = await user("a@example.com"),
+    b = await user("b@example.com"),
+    fa = await linkStart(a.cookie),
+    fb = await linkStart(b.cookie);
+  providerMock("verified@example.com");
+  const results = await Promise.all(
+    [fa, fb].map((flow) =>
+      request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      ),
+    ),
+  );
+  expect(results.map((r) => r.status).sort()).toEqual([302, 409]);
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM oauth_accounts").first("n"),
+  ).toBe(1);
+  expect([a.id, b.id]).toContain(
+    await stmt(bindings, "SELECT user_id FROM oauth_accounts").first("user_id"),
+  );
+});
+test("linking another identity for an already-linked provider does not replace the original", async () => {
+  const u = await user();
+  await stmt(
+    bindings,
+    "INSERT INTO oauth_accounts(provider,subject,user_id) VALUES('google','original-identity',?)",
+    u.id,
+  ).run();
+  const flow = await linkStart(u.cookie);
+  providerMock();
+  expect(
+    (
+      await request(
+        `/auth/oauth/google/callback?state=${flow.state}&code=code`,
+        "GET",
+        undefined,
+        flow.cookie,
+        credentials,
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    await stmt(
+      bindings,
+      "SELECT subject FROM oauth_accounts WHERE user_id=?",
+      u.id,
+    ).first("subject"),
+  ).toBe("original-identity");
+});

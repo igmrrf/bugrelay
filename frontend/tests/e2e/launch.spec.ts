@@ -222,12 +222,52 @@ test("company email claim, status response and moderation are usable through the
     .click();
   await expect(page).toHaveURL(/\/bugs\/[a-f0-9-]+$/);
   const reportURL = page.url();
+  const reportData = await (
+    await page.request.get(`/api/v1/bugs/${reportURL.split("/").pop()}`)
+  ).json();
+  expect(
+    reportData.companyId,
+    "Selected company must survive profile/options refresh",
+  ).toBe(companyURL.split("/").pop());
+  expect(reportData.canManage).toBe(true);
   await page.getByLabel("Status", { exact: true }).selectOption("resolved");
   await page
     .getByLabel("Response (optional)")
     .fill("Fixed in the current release.");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText("Fixed in the current release.")).toBeVisible();
+  const responseComment = page
+    .locator("article.comment")
+    .filter({ hasText: "Fixed in the current release." })
+    .first();
+  await responseComment
+    .getByRole("button", { name: "Reply", exact: true })
+    .click();
+  await responseComment
+    .getByLabel("Reply to Company Owner")
+    .fill("Confirmed the fix with a fresh install.");
+  await responseComment
+    .getByRole("button", { name: "Post reply", exact: true })
+    .click();
+  await expect(
+    page.getByText("Confirmed the fix with a fresh install.", { exact: true }),
+  ).toBeVisible();
+  page.once("dialog", (dialog) =>
+    dialog.accept("Review only the parent comment."),
+  );
+  await responseComment
+    .getByRole("button", { name: "Flag comment", exact: true })
+    .first()
+    .click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Comment sent for moderation." }),
+  ).toBeVisible();
+  await page.goto(companyURL);
+  await expect(page.getByText(/Average resolution:/)).toContainText(
+    "1 resolved/closed",
+  );
   await page.goto(`${companyURL}/team`);
   await expect(
     page.getByRole("cell", { name: email, exact: true }),
@@ -242,7 +282,23 @@ test("company email claim, status response and moderation are usable through the
     email,
   ]);
   await page.reload();
+  await page.goto("/admin/moderation");
+  await expect(page.getByText("Flagged comment")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Delete comment", exact: true })
+    .click();
+  await expect(page.getByText("No pending reports.")).toBeVisible();
   await page.goto(reportURL);
+  await expect(
+    page.getByText("[Deleted comment]", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "View replies (1)", exact: true })
+    .click();
+  await expect(
+    page.getByText("Confirmed the fix with a fresh install.", { exact: true }),
+  ).toBeVisible();
   page.once("dialog", (dialog) =>
     dialog.accept("Local moderation fixture for testing."),
   );

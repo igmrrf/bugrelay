@@ -149,6 +149,7 @@ export function SubmitScreen() {
     action = useAction();
   const companies = useResource<Page<Company>>("/companies?limit=100"),
     config = useResource<PublicConfig>("/config");
+  const [companyId, setCompanyId] = useState("");
   const [category, setCategory] = useState("bug"),
     [visibility, setVisibility] = useState("public"),
     [token, setToken] = useState(""),
@@ -188,7 +189,7 @@ export function SubmitScreen() {
                   title,
                   description: String(values.get("description")),
                   applicationName: String(values.get("applicationName")),
-                  companyId: values.get("companyId") || undefined,
+                  companyId: companyId || undefined,
                   category,
                   severity: String(values.get("severity")),
                   visibility:
@@ -244,7 +245,11 @@ export function SubmitScreen() {
               label="Company (optional)"
               hint="Not listed? Leave this unassigned; the report can still be submitted."
             >
-              <select name="companyId">
+              <select
+                name="companyId"
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+              >
                 <option value="">Unassigned</option>
                 {companies.data?.items.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -603,7 +608,7 @@ export function BugDetailScreen() {
                 )}
               </section>
               <section className="card">
-                <h2>Discussion ({b.commentCount})</h2>
+                <h2>Discussion</h2>
                 <Loading {...comments} />
                 {comments.data?.items.map((cm) => (
                   <CommentItem key={cm.id} comment={cm} reload={reload} />
@@ -708,6 +713,9 @@ export function BugDetailScreen() {
               )}
               <div className="card">
                 <h3>Report details</h3>
+                {b.resolvedAt && (
+                  <p>Resolved {new Date(b.resolvedAt).toLocaleString()}</p>
+                )}
                 <div className="label-value">
                   <small>Visibility</small>
                   <span>
@@ -762,9 +770,20 @@ function CommentItem({
   reload: () => void;
 }) {
   const action = useAction(),
-    [editing, setEditing] = useState(false);
+    { user } = useSession(),
+    [editing, setEditing] = useState(false),
+    [expanded, setExpanded] = useState(false),
+    [replying, setReplying] = useState(false),
+    [page, setPage] = useState(1),
+    [newReplies, setNewReplies] = useState(0);
+  const replies = useResource<Page<Comment>>(
+    expanded
+      ? `/bugs/${cm.bugId}/comments?parentId=${cm.id}&page=${page}`
+      : null,
+  );
+
   return (
-    <div className="comment">
+    <article className="comment" id={`comment-${cm.id}`}>
       <small>
         <strong>{cm.author.displayName}</strong> · {date(cm.createdAt)}
       </small>
@@ -821,7 +840,82 @@ function CommentItem({
           </button>
         </div>
       )}
+      {user?.isEmailVerified && !cm.isDeleted && (
+        <div className="row">
+          {cm.depth < 5 && (
+            <button className="link" onClick={() => setReplying((v) => !v)}>
+              Reply
+            </button>
+          )}
+          <button
+            className="link"
+            disabled={action.busy}
+            onClick={() => {
+              const reason = window.prompt(
+                "Why should a moderator review this comment?",
+              );
+              if (reason)
+                void action.run(async () => {
+                  await send(`/bugs/${cm.bugId}/comments/${cm.id}/report`, {
+                    reason,
+                  });
+                  action.setMessage("Comment sent for moderation.");
+                });
+            }}
+          >
+            Flag comment
+          </button>
+        </div>
+      )}
+      {replying && (
+        <form
+          onSubmit={(e) => {
+            const form = e.currentTarget,
+              v = formValues(e);
+            void action.run(async () => {
+              await send(`/bugs/${cm.bugId}/comments/${cm.id}/replies`, {
+                content: String(v.get("content")),
+              });
+              form.reset();
+              setReplying(false);
+              setExpanded(true);
+              setNewReplies((v) => v + 1);
+              replies.reload();
+              action.setMessage("Reply posted.");
+            });
+          }}
+        >
+          <Field label={`Reply to ${cm.author.displayName}`}>
+            <textarea name="content" required maxLength={10000} />
+          </Field>
+          <button disabled={action.busy}>Post reply</button>
+        </form>
+      )}
+      {(cm.replyCount + newReplies > 0 || expanded) && (
+        <button
+          className="link"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded
+            ? "Hide replies"
+            : `View replies (${cm.replyCount + newReplies})`}
+        </button>
+      )}
+      {expanded && (
+        <div className="replies">
+          <Loading {...replies} />
+          {replies.data?.items.map((reply) => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              reload={replies.reload}
+            />
+          ))}
+          {replies.data && <Pager data={replies.data} onPage={setPage} />}
+        </div>
+      )}
       <Feedback {...action} />
-    </div>
+    </article>
   );
 }

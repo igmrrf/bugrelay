@@ -341,7 +341,17 @@ companies.get("/:id/analytics", async (c) => {
     cid,
     ...a.args,
   );
+  const resolution = await row<{
+    resolvedBugCount: number;
+    averageResolutionHours: number | null;
+  }>(
+    c.env,
+    `SELECT count(*) AS resolvedBugCount,avg(max(0,(julianday(b.resolved_at)-julianday(b.created_at))*24)) AS averageResolutionHours FROM bugs b WHERE b.company_id=? AND b.resolved_at IS NOT NULL AND b.status IN ('resolved','closed') AND ${a.sql}`,
+    cid,
+    ...a.args,
+  );
   return c.json({
+    ...resolution,
     totalBugs: counts.reduce((n, v) => n + v.count, 0),
     byStatus: counts,
   });

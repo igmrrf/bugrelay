@@ -308,6 +308,11 @@ export function SettingsScreen() {
   const sessions = useResource<{ sessions: SessionItem[] }>(
     user ? "/auth/sessions" : null,
   );
+  const config = useResource<PublicConfig>("/config");
+  const linked = useResource<{
+    accounts: { provider: string }[];
+    hasPassword: boolean;
+  }>(user?.isEmailVerified ? "/auth/oauth/accounts" : null);
   return (
     <RequireAuth>
       <PageTitle title="Account settings" />
@@ -341,6 +346,76 @@ export function SettingsScreen() {
             <p className="muted">{user?.email}</p>
             <button disabled={action.busy}>Save profile</button>
           </form>
+          <section className="card">
+            <h2>Linked sign-in accounts</h2>
+            <Feedback error={linked.error} />
+            <p>
+              Link only a provider account you control. Your BugRelay email
+              stays unchanged.
+            </p>
+            {linked.data?.accounts.map((a) => (
+              <p key={a.provider}>
+                {a.provider === "google" ? "Google" : "GitHub"} is linked.
+              </p>
+            ))}
+            {!user?.isEmailVerified ? (
+              <p>Verify your email before linking an account.</p>
+            ) : (
+              config.data?.oauthProviders
+                .filter(
+                  (provider) =>
+                    !linked.data?.accounts.some((a) => a.provider === provider),
+                )
+                .map((provider) => (
+                  <form
+                    key={provider}
+                    onSubmit={(e) => {
+                      const v = formValues(e);
+                      void action.run(async () => {
+                        const result = await send<{ url: string }>(
+                          `/auth/oauth/${provider}/link`,
+                          {
+                            ...(linked.data?.hasPassword
+                              ? {
+                                  currentPassword: String(
+                                    v.get("currentPassword"),
+                                  ),
+                                }
+                              : {}),
+                          },
+                        );
+                        window.location.assign(result.url);
+                      });
+                    }}
+                  >
+                    {linked.data?.hasPassword ? (
+                      <Field
+                        label={`Confirm password to link ${provider === "google" ? "Google" : "GitHub"}`}
+                      >
+                        <input
+                          type="password"
+                          name="currentPassword"
+                          autoComplete="current-password"
+                          required
+                          maxLength={72}
+                        />
+                      </Field>
+                    ) : (
+                      <p className="muted">
+                        Sign in within the last 10 minutes with your current
+                        provider before linking another account.
+                      </p>
+                    )}
+                    <button disabled={action.busy || !linked.data}>
+                      Link {provider === "google" ? "Google" : "GitHub"}
+                    </button>
+                  </form>
+                ))
+            )}
+            {config.data && !config.data.oauthProviders.length && (
+              <p className="muted">Provider sign-in is not enabled.</p>
+            )}
+          </section>
           <form
             className="card"
             onSubmit={(e) => {

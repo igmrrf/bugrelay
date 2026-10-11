@@ -1,8 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { emailSchema } from "@bugrelay/contracts";
 import { getCookie, setCookie } from "hono/cookie";
 import {
+  audit,
+  body,
+  requireUser,
+  rows,
   createSession,
   digest,
   fail,
@@ -13,7 +18,7 @@ import {
   row,
   stmt,
 } from "./core";
-import type { AppEnv, Env, UserRow } from "./types";
+import type { AppEnv, Ctx, Env, UserRow } from "./types";
 const oauth = new Hono<AppEnv>();
 function settings(env: Env, provider: string) {
   if (provider === "google" && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
@@ -38,20 +43,65 @@ function settings(env: Env, provider: string) {
 }
 const stateCookie = (env: Env) =>
   env.ENVIRONMENT === "production" ? "__Host-bugrelay_oauth" : "bugrelay_oauth";
-oauth.get("/:provider", async (c) => {
+oauth.get("/accounts", async (c) => {
+  const u = requireUser(c);
+  const accounts = await rows<{ provider: string }>(
+    c.env,
+    "SELECT provider FROM oauth_accounts WHERE user_id=? ORDER BY provider",
+    u.id,
+  );
+  return c.json({ accounts, hasPassword: !!u.password_hash });
+});
+oauth.post("/:provider/link", async (c) => {
+  const u = requireUser(c),
+    session = c.get("session")!;
+  await rateLimit(c, "oauth-link", 5, 900, u.id);
+  const v = await body(
+    c,
+    z.object({ currentPassword: z.string().max(72).optional() }).strict(),
+  );
+  if (u.password_hash) {
+    if (
+      !v.currentPassword ||
+      new TextEncoder().encode(v.currentPassword).length > 72 ||
+      !(await bcrypt.compare(v.currentPassword, u.password_hash))
+    )
+      fail(
+        401,
+        "REAUTH_REQUIRED",
+        "Confirm your current password before linking an account.",
+      );
+  } else if (Date.parse(session.created_at) < Date.now() - 10 * 60000)
+    fail(
+      401,
+      "REAUTH_REQUIRED",
+      "Sign in again with your existing provider before linking another account.",
+    );
+  const url = await beginOAuth(c, "link", u.id, session.id);
+  return c.json({ url });
+});
+async function beginOAuth(
+  c: Ctx,
+  intent: "login" | "link",
+  userId: string | null = null,
+  sessionId: string | null = null,
+) {
   await rateLimit(c, "oauth-start", 20, 900);
-  const config = settings(c.env, c.req.param("provider"));
+  const config = settings(c.env, c.req.param("provider")!);
   const state = randomToken(),
     browser = randomToken(),
     verifier = randomToken();
   await stmt(
     c.env,
-    "INSERT INTO oauth_states(state_hash,provider,verifier,browser_hash,expires_at) VALUES(?,?,?,?,?)",
+    "INSERT INTO oauth_states(state_hash,provider,verifier,browser_hash,expires_at,intent,user_id,session_id) VALUES(?,?,?,?,?,?,?,?)",
     await digest(state),
     config.provider,
     verifier,
     await digest(browser),
     new Date(Date.now() + 600000).toISOString(),
+    intent,
+    userId,
+    sessionId,
   ).run();
   setCookie(c, stateCookie(c.env), browser, {
     path: "/",
@@ -77,25 +127,47 @@ oauth.get("/:provider", async (c) => {
     code_challenge: challenge,
     code_challenge_method: "S256",
   }).toString();
-  return c.redirect(url.toString());
-});
+  if (intent === "link")
+    url.searchParams.set(
+      config.provider === "google" ? "prompt" : "allow_signup",
+      config.provider === "google" ? "select_account" : "false",
+    );
+  return url.toString();
+}
+oauth.get("/:provider", async (c) => c.redirect(await beginOAuth(c, "login")));
 oauth.get("/:provider/callback", async (c) => {
   await rateLimit(c, "oauth-callback", 30, 900);
-  const config = settings(c.env, c.req.param("provider"));
+  const config = settings(c.env, c.req.param("provider")!);
   const state = c.req.query("state"),
     code = c.req.query("code"),
     browser = getCookie(c, stateCookie(c.env));
   if (!state || !code || !browser || state.length > 128 || code.length > 2048)
     fail(400, "INVALID_OAUTH", "Invalid sign-in response.");
-  const saved = await row<{ verifier: string }>(
+  const saved = await row<{
+    verifier: string;
+    intent: "login" | "link";
+    user_id: string | null;
+    session_id: string | null;
+  }>(
     c.env,
-    "DELETE FROM oauth_states WHERE state_hash=? AND provider=? AND browser_hash=? AND expires_at>? RETURNING verifier",
+    "DELETE FROM oauth_states WHERE state_hash=? AND provider=? AND browser_hash=? AND expires_at>? RETURNING verifier,intent,user_id,session_id",
     await digest(state),
     config.provider,
     await digest(browser),
     now(),
   );
   if (!saved) fail(400, "INVALID_OAUTH", "Sign-in expired. Please try again.");
+  if (
+    saved.intent === "link" &&
+    (!c.get("user")?.email_verified ||
+      c.get("user")?.id !== saved.user_id ||
+      c.get("session")?.id !== saved.session_id)
+  )
+    fail(
+      401,
+      "LINK_SESSION_CHANGED",
+      "Sign in and start account linking again.",
+    );
   setCookie(c, stateCookie(c.env), "", {
     path: "/",
     httpOnly: true,
@@ -187,6 +259,53 @@ oauth.get("/:provider/callback", async (c) => {
     email = verified.email.toLowerCase();
     name = p.name ?? p.login;
   }
+  if (saved.intent === "link") {
+    // Re-check the authoritative session after the provider network round trip.
+    const live = await row(
+      c.env,
+      "SELECT s.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.user_id=? AND s.expires_at>? AND u.suspended=0 AND u.email_verified=1",
+      saved.session_id,
+      saved.user_id,
+      now(),
+    );
+    if (!live)
+      fail(
+        401,
+        "LINK_SESSION_CHANGED",
+        "Sign in and start account linking again.",
+      );
+    const result = await stmt(
+      c.env,
+      "INSERT INTO oauth_accounts(provider,subject,user_id) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.user_id=? AND s.expires_at>? AND u.suspended=0 AND u.email_verified=1) ON CONFLICT DO NOTHING RETURNING user_id",
+      config.provider,
+      subject,
+      saved.user_id,
+      saved.session_id,
+      saved.user_id,
+      now(),
+    ).first();
+    const linked = await row<{ user_id: string }>(
+      c.env,
+      "SELECT user_id FROM oauth_accounts WHERE provider=? AND subject=?",
+      config.provider,
+      subject,
+    );
+    if (linked?.user_id !== saved.user_id)
+      fail(
+        409,
+        "LINK_CONFLICT",
+        "This provider identity is already linked, or you have another account linked for this provider.",
+      );
+    if (result)
+      await audit(
+        c.env,
+        saved.user_id!,
+        "oauth_account_linked",
+        "user",
+        saved.user_id!,
+      ).run();
+    return c.redirect(`${c.env.APP_ORIGIN}/profile`);
+  }
   let user = await row<UserRow>(
     c.env,
     "SELECT u.* FROM users u JOIN oauth_accounts o ON o.user_id=u.id WHERE o.provider=? AND o.subject=?",
@@ -198,7 +317,7 @@ oauth.get("/:provider/callback", async (c) => {
       fail(
         409,
         "ACCOUNT_EXISTS",
-        "An account already uses this email. Sign in with your existing password; OAuth is not linked automatically.",
+        "An account already uses this email. Sign in with your existing method and link the provider in account settings. OAuth is not linked automatically.",
       );
     const userId = id(),
       time = now();

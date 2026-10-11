@@ -118,6 +118,7 @@ export interface Bug {
   createdAt: string;
   updatedAt: string;
   attachments: Attachment[];
+  resolvedAt: string | null;
   canEdit: boolean;
   canManage: boolean;
 }
@@ -129,6 +130,10 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
   canEdit: boolean;
+  parentId: string | null;
+  depth: number;
+  replyCount: number;
+  isDeleted: boolean;
 }
 export interface Company {
   id: string;

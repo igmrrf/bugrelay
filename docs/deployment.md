@@ -6,6 +6,17 @@ No resource has been provisioned or deployed by this migration. The user supplie
 
 Cloudflare authentication is owned by the parent/operator. A connected chat app does not automatically authenticate this shell. Do not extract connector credentials or paste tokens into chat. Use the operator's already-authorized Cloudflare CLI session, or a platform-supported secret injection path for an existing appropriately scoped API token. If a new authorization is necessary, the operator must approve and complete Wrangler's interactive login on their own trusted machine before work continues. Follow with read-only `wrangler whoami` and account/zone/resource inspection; do not combine setup with deployment. No new login/grant or credential was created here.
 
+### Smallest supported sign-in step for this cloud environment
+
+After the user explicitly approves a new **read-only** Cloudflare OAuth grant, start the following in the selected environment (using its existing writable `XDG_CONFIG_HOME` outside the repository):
+
+```sh
+npx wrangler login --device --browser=false --scopes account:read user:read zone:read
+npx wrangler whoami
+```
+
+The user completes the short code at Cloudflare’s official device-authorization page in their own browser. No API token needs to be pasted into chat, no localhost port forwarding is required, and these scopes request no resource-write access. This is enough to establish identity/account/zone context, not to verify every D1/R2/Email setting or deploy. Broader inspection should use already-authorized read-only account access or a separately reviewed grant. Default unscoped Wrangler login requests all available scopes, so do not substitute it silently. These commands are documented only; no login was initiated here. Verified against installed Wrangler 4.149.0 help/scopes and [Cloudflare’s login documentation](https://developers.cloudflare.com/workers/wrangler/commands/general/#login).
+
 ## Exact intended resource changes (approval required)
 
 1. Verify the intended Cloudflare account, its Workers Paid plan, and the existing `bugrelay.com` zone. Inspect current DNS/routes and existing deployments before changing them.

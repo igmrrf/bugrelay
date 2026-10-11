@@ -8,9 +8,9 @@ All browser calls use `/api/v1` on the application origin, with HttpOnly session
 | Registration/session | `POST /auth/register`, `/auth/login`, `/auth/logout`; `GET/PATCH /auth/profile` |
 | Session management | `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/sessions/revoke-all` |
 | Email/password | `POST /auth/verify-email/request`, `/auth/verify-email/confirm`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password` |
-| OAuth | `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback` |
+| OAuth | `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback`, `GET /auth/oauth/accounts`, `POST /auth/oauth/:provider/link` |
 | Reports | `GET/POST /bugs`, `GET/PATCH/DELETE /bugs/:id`, `POST /bugs/search-duplicates`, `PATCH /bugs/:id/status` |
-| Discussion | `POST/DELETE /bugs/:id/vote`, `GET/POST /bugs/:id/comments`, `PATCH/DELETE /bugs/:id/comments/:commentId`, `POST /bugs/:id/report` |
+| Discussion | `POST/DELETE /bugs/:id/vote`, `GET/POST /bugs/:id/comments`, `PATCH/DELETE /bugs/:id/comments/:commentId`, `POST /bugs/:id/report`, `POST /bugs/:id/comments/:commentId/replies`, `POST /bugs/:id/comments/:commentId/report` |
 | Attachments | `POST /bugs/:id/attachments` (`file` multipart field), `GET/DELETE /bugs/:id/attachments/:attachmentId` |
 | Companies | `GET/POST /companies`, `GET /companies/:id`, `/companies/:id/bugs`, `/companies/:id/analytics`; `PATCH /companies/:id/settings` |
 | Company proof/team | `POST /companies/:id/claim`, `/companies/:id/verify`; `GET/POST /companies/:id/members`, `PATCH/DELETE /companies/:id/members/:memberId` |
@@ -21,3 +21,9 @@ All browser calls use `/api/v1` on the application origin, with HttpOnly session
 Report requests and response DTOs live in `packages/contracts/src/index.ts`. Visibility is explicit and security category forces private. Update requests intentionally cannot change visibility or impersonate another author. A registered product name is not proof of company ownership.
 
 New passwords must be at least 12 characters and at most 72 UTF-8 bytes. Verification/reset/claim tokens arrive by email, expire after one hour, and are never returned from request endpoints. OAuth success redirects to `/dashboard`; disabled providers return 404.
+
+Discussion lists paginate root comments by default; `parentId` selects one comment’s direct replies. Counts describe that sibling level. Comment DTOs include `parentId`, `depth`, `replyCount` and `isDeleted`; removed parent text is replaced by a tombstone. Reply nesting is bounded at five levels. Parent relationships and authors cannot be changed through updates.
+
+OAuth linking starts with an Origin-protected POST from a verified session. Password accounts supply `currentPassword`; passwordless accounts require a session created in the last ten minutes. The returned provider URL carries a one-time intent bound to the browser and exact user/session. Callback rechecks live authorization after provider requests. Linking never changes the account email or reassigns an existing provider identity.
+
+Report DTOs include `resolvedAt`. `resolved`/`closed` preserve the first terminal timestamp until reopening. Company analytics returns `resolvedBugCount` and nullable `averageResolutionHours` for accessible nondeleted reports currently in a terminal state. This measures report age at resolution, not staff working time or a promised SLA.

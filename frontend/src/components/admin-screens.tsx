@@ -25,6 +25,8 @@ interface AdminUser {
 interface Moderation {
   id: string;
   bugId: string;
+  commentId: string | null;
+  commentContent: string | null;
   reason: string;
   title: string;
   status: string;
@@ -215,6 +217,14 @@ export function AdminScreen({
                 <h2>
                   <Link href={`/bugs/${m.bugId}`}>{m.title}</Link>
                 </h2>
+                {m.commentId && (
+                  <>
+                    <strong>Flagged comment</strong>
+                    <blockquote className="prose">
+                      {m.commentContent || "[Deleted comment]"}
+                    </blockquote>
+                  </>
+                )}
                 <p className="prose">{m.reason}</p>
                 <div className="row">
                   {(["approve", "reject", "delete"] as const).map((choice) => (
@@ -226,7 +236,9 @@ export function AdminScreen({
                         if (
                           choice === "delete" &&
                           !window.confirm(
-                            "Delete this report from public and private access?",
+                            m.commentId
+                              ? "Delete this comment? The report and replies remain."
+                              : "Delete this report from public and private access?",
                           )
                         )
                           return;
@@ -243,7 +255,9 @@ export function AdminScreen({
                         ? "Mark reviewed"
                         : choice === "reject"
                           ? "Dismiss flag"
-                          : "Delete report"}
+                          : m.commentId
+                            ? "Delete comment"
+                            : "Delete report"}
                     </button>
                   ))}
                 </div>

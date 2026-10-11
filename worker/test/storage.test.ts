@@ -101,7 +101,7 @@ test("scheduled cleanup removes old deleted reports and dependent objects but pr
   ).run();
   await stmt(
     bindings,
-    "INSERT INTO oauth_states VALUES('old','google','verifier','browser','2000-01-01T00:00:00.000Z')",
+    "INSERT INTO oauth_states(state_hash,provider,verifier,browser_hash,expires_at) VALUES('old','google','verifier','browser','2000-01-01T00:00:00.000Z')",
   ).run();
   await stmt(bindings, "INSERT INTO rate_limits VALUES('old',1,1)").run();
   await stmt(

@@ -48,8 +48,8 @@ API integration tests execute inside workerd with local D1 and R2, not SQLite mo
 - A verified account is required for private/security reports, attachments, votes, comments and company management. Security reports are always private. Public author DTOs never expose email addresses.
 - Private readers are the reporter, platform administrators, and members of the **verified assigned company**. This applies to lists, search/duplicates, counts, details, comments, votes and attachment downloads.
 - New product names can be reported immediately. Company listings are created explicitly with a domain; a product name never grants ownership. Work-email verification establishes the first company administrator; team administrators add already-verified accounts.
-- Company members can respond and update status. Reporters/admins can edit or remove reports. Report visibility is immutable, and private reports cannot be merged into a broader audience.
-- Email/password registration, one-time verification/recovery, revocable cookie sessions, optional Google/GitHub OAuth, moderation, merging and audit export are implemented. OAuth buttons appear only when that provider is configured; existing email accounts are not silently linked to an OAuth identity.
+- Company members can respond and update status; their dashboard includes resolution-time analytics. Reporters/admins can edit or remove reports. Report visibility is immutable, and private reports cannot be merged into a broader audience.
+- Email/password registration, one-time verification/recovery, revocable cookie sessions, optional Google/GitHub OAuth with explicit account linking, threaded discussions, comment moderation, merging and audit export are implemented. OAuth buttons appear only when that provider is configured; existing email accounts are not silently linked to an OAuth identity.
 - No fictitious WebSocket, metrics, notification-inbox or automatic retry behavior is advertised. Updates are fetched from the API. Transactional email handles account and company verification/recovery.
 
 ## Release

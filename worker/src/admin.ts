@@ -175,7 +175,7 @@ admin.get("/moderation", async (c) => {
     .parse(c.req.query("status"));
   const list = await rows(
     c.env,
-    "SELECT m.id,m.bug_id AS bugId,m.reason,m.status,m.created_at AS createdAt,b.title FROM moderation m JOIN bugs b ON b.id=m.bug_id WHERE m.status=? ORDER BY m.created_at LIMIT ? OFFSET ?",
+    "SELECT m.id,m.bug_id AS bugId,m.comment_id AS commentId,CASE WHEN cm.deleted_at IS NULL THEN cm.content ELSE NULL END AS commentContent,m.reason,m.status,m.created_at AS createdAt,b.title FROM moderation m JOIN bugs b ON b.id=m.bug_id LEFT JOIN comments cm ON cm.id=m.comment_id WHERE m.status=? ORDER BY m.created_at LIMIT ? OFFSET ?",
     status,
     p.limit,
     p.offset,
@@ -193,9 +193,13 @@ admin.post("/moderation/:id", async (c) => {
     c,
     z.object({ action: z.enum(["approve", "reject", "delete"]) }).strict(),
   );
-  const item = await row<{ bug_id: string; status: string }>(
+  const item = await row<{
+    bug_id: string;
+    comment_id: string | null;
+    status: string;
+  }>(
     c.env,
-    "SELECT bug_id,status FROM moderation WHERE id=?",
+    "SELECT bug_id,comment_id,status FROM moderation WHERE id=?",
     c.req.param("id"),
   );
   if (!item) fail(404, "NOT_FOUND", "Moderation item not found.");
@@ -210,16 +214,22 @@ admin.post("/moderation/:id", async (c) => {
       time,
       c.req.param("id"),
     ),
-    audit(c.env, u.id, `moderation_${v.action}`, "bug", item.bug_id),
+    audit(
+      c.env,
+      u.id,
+      `moderation_${v.action}`,
+      item.comment_id ? "comment" : "bug",
+      item.comment_id ?? item.bug_id,
+    ),
   ];
   if (v.action === "delete")
     operations.unshift(
       stmt(
         c.env,
-        "UPDATE bugs SET deleted_at=?,updated_at=? WHERE id=? AND EXISTS(SELECT 1 FROM moderation WHERE id=? AND status='pending')",
+        `UPDATE ${item.comment_id ? "comments" : "bugs"} SET deleted_at=?,updated_at=? WHERE id=? AND EXISTS(SELECT 1 FROM moderation WHERE id=? AND status='pending')`,
         time,
         time,
-        item.bug_id,
+        item.comment_id ?? item.bug_id,
         c.req.param("id"),
       ),
     );
@@ -325,6 +335,24 @@ admin.post("/bugs/merge", async (c) => {
     ),
     stmt(
       c.env,
+      `DELETE FROM moderation WHERE comment_id IS NULL AND bug_id IN (${placeholders}) AND reporter_id IN (SELECT reporter_id FROM moderation WHERE bug_id=? AND comment_id IS NULL)`,
+      ...ids,
+      primary.id,
+    ),
+    stmt(
+      c.env,
+      `DELETE FROM moderation WHERE comment_id IS NULL AND bug_id IN (${placeholders}) AND id NOT IN (SELECT min(id) FROM moderation WHERE comment_id IS NULL AND bug_id IN (${placeholders}) GROUP BY reporter_id)`,
+      ...ids,
+      ...ids,
+    ),
+    stmt(
+      c.env,
+      `UPDATE moderation SET bug_id=? WHERE bug_id IN (${placeholders})`,
+      primary.id,
+      ...ids,
+    ),
+    stmt(
+      c.env,
       `UPDATE attachments SET bug_id=? WHERE bug_id IN (${placeholders})`,
       primary.id,
       ...ids,
@@ -357,7 +385,9 @@ admin.patch("/bugs/bulk/status", async (c) => {
     ...v.bugIds.map((id) =>
       stmt(
         c.env,
-        "UPDATE bugs SET status=?,updated_at=? WHERE id=? AND deleted_at IS NULL",
+        "UPDATE bugs SET status=?,updated_at=?,resolved_at=CASE WHEN ? IN ('resolved','closed') THEN COALESCE(resolved_at,?) ELSE NULL END WHERE id=? AND deleted_at IS NULL",
+        v.status,
+        now(),
         v.status,
         now(),
         id,

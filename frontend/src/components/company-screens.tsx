@@ -155,6 +155,8 @@ export function CompanyScreen({
     ),
     analytics = useResource<{
       totalBugs: number;
+      resolvedBugCount: number;
+      averageResolutionHours: number | null;
       byStatus: { status: string; count: number }[];
     }>(
       tab === "reports" && (!!member || user?.isAdmin)
@@ -192,6 +194,12 @@ export function CompanyScreen({
             <>
               {analytics.data && (
                 <div className="row toolbar">
+                  <span className="badge">
+                    Average resolution:{" "}
+                    {analytics.data.averageResolutionHours === null
+                      ? "No resolved reports"
+                      : `${analytics.data.averageResolutionHours.toFixed(1)} hours (${analytics.data.resolvedBugCount} resolved/closed)`}
+                  </span>
                   {analytics.data.byStatus.map((s) => (
                     <span className="badge" key={s.status}>
                       {s.status.replace("_", " ")}: {s.count}
