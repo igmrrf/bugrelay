@@ -9,6 +9,11 @@ const template = await Promise.all(
     parse(await readFile(`config/${name}.staging.example.jsonc`, "utf8")),
   ),
 );
+test("both staging templates limit CPU time per invocation to 1000 ms", () => {
+  for (const config of template) {
+    assert.equal(config.limits?.cpu_ms, 1000, config.name);
+  }
+});
 function fixture(email = false) {
   const [api, web] = structuredClone(template);
   api.account_id = web.account_id = "a".repeat(32);

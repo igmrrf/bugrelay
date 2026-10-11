@@ -15,6 +15,8 @@ This prepares a secure staging deployment; it does not authorize provisioning, c
 | OAuth | Disabled; do not configure Google/GitHub client IDs or secrets |
 | Email | Disabled initially; optional single approved destination and sender `notifications@bugrelay.com` |
 
+Both staging Worker templates set `limits.cpu_ms` to `1000` (1 second of CPU time per invocation). This reduces CPU exposure per invocation; it is not a total spend cap and does not enforce the approved $5 additional staging budget. Request volume, storage and other billable usage still require monitoring.
+
 Both configurations set `ENVIRONMENT=staging`. This mode uses the production authentication and authorization paths, real server-verified Turnstile with exact hostname checking, strict mutation Origin checking, and Secure/HttpOnly/SameSite=Lax `__Host-` session cookies. Request hosts must match the configured origin. Missing/malformed configuration and provider failures fail closed. Cloudflare dummy keys/tokens are rejected. Development/test challenge bypasses work only with loopback origins and loopback request URLs; never deploy those modes publicly.
 
 ## Operator values
