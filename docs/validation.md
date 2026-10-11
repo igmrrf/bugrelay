@@ -10,7 +10,7 @@ Active draft: [PR #2](https://github.com/igmrrf/bugrelay/pull/2). Branch: `feat/
 | --- | --- |
 | Fresh locked install | `npm ci` passed on Node 24.19.0 / npm 11.9.0 |
 | TypeScript / ESLint / Prettier | Passed on API, contracts, frontend and test code |
-| API runtime tests | **77 passed**, ten suites inside workerd with actual local D1/R2 |
+| API runtime tests | **79 passed**, ten suites inside workerd with actual local D1/R2 |
 | Frontend regression tests | **9 passed** |
 | Production configuration tests | **9 passed**; reject unresolved templates, unintended routes/previews/domain/account/sender/binding and plaintext secrets |
 | Browser launch journeys | **3 passed** on Chromium against the **compiled OpenNext Worker + private API service binding**, with local D1/R2 and simulated email |
@@ -28,7 +28,7 @@ API tests cover authorization before admin side effects; privacy in details, cou
 ## Independent security review follow-up
 
 - Authentication race: five deterministic held-bcrypt regressions reproduced session recreation after reset, password change, revoke-all, suspension and suspend/restore on the prior implementation. Conditional insertion now binds every session to the verified password hash/authentication epoch and active account. Four additional regressions cover registration/OAuth issuance at the D1 write boundary and password-change reauthentication after session revocation.
-- Company privacy: mail.com/email.com and an unclassified-provider regression reproduced automatic company authority from a mailbox. Mail confirmation now creates an inert pending claim. Eleven claim tests cover preapproval report/attachment/aggregate denial, independent evidence-bearing administrator approval, self-review denial, rejection/resubmission, stale claimant/reviewer state, concurrent review/claims, and upgrade revocation of earlier email-only grants. The compiled browser journey includes applicant pending status and a separate reviewer’s approval.
+- Company privacy: mail.com/email.com and an unclassified-provider regression reproduced automatic company authority from a mailbox. Mail confirmation now creates an inert pending claim. Thirteen claim tests cover preapproval report/attachment/aggregate denial, independent evidence-bearing administrator approval, self-review denial, rejection/resubmission, stale claimant/reviewer state, concurrent review/claims, and upgrade revocation of all earlier company authority, including missing-audit grants, dormant memberships and ownerless verification. A no-audit upgrade regression returned private-report HTTP 200 against the prior migration and now requires HTTP 404. The compiled browser journey includes applicant pending status and a separate reviewer’s approval.
 
 ## Failures found and corrected during validation
 
@@ -54,3 +54,5 @@ Live OAuth checks are required only if the optional providers are enabled. Real 
 Local evidence is outside Git at `/workspace/bugrelay-review-evidence/`: `fresh-install.log`, baseline `final-*.log`, latest `parity-{types,lint,format-check,tests,build,opennext,browser}.log` and `parity-audit.json`. Browser artifacts are in `frontend/test-results` and `frontend/playwright-report`. Simulated email/runtime logs are private local artifacts and are excluded from the PR. Test-runner `deleteAllDurableObjects()` diagnostics and occasional browser navigation disconnect logs are harness/runtime diagnostics; the passing assertions and process exit statuses above are recorded separately.
 
 Security follow-up evidence: `auth-race-before.log` (five regressions fail on the prior code), `company-claims-before.log` (three privacy regressions fail), and `security-{api-tests,types,lint,format-check,tests,build,opennext,browser}.log`. Current exact-head CI remains the authoritative publication check.
+
+Upgrade follow-up evidence: `upgrade-before.log` records the no-audit regression failing against the prior migration; `upgrade-tests.log` and `upgrade-types.log` record the repaired migration and current API/static checks. No remote migration or login was attempted.

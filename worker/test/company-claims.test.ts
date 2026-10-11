@@ -470,61 +470,127 @@ test("two simultaneous claims cannot grant competing company administrators", as
     ).first("n"),
   ).toBe(0);
 });
-test("upgrade revokes prior email-only owners and their invites until independent review", async () => {
-  await reset();
-  await applyD1Migrations(base.DB, base.MIGRATIONS.slice(0, 6));
-  const owner = await user("owner@acme.example"),
-    invited = await user("invited@acme.example"),
-    reporter = await user();
-  const cid = await company(owner, "acme.example");
-  await stmt(
-    bindings,
-    "INSERT INTO company_members(id,company_id,user_id,role,created_at) VALUES(?,?,?,'member',?)",
-    id(),
-    cid,
-    invited.id,
-    now(),
-  ).run();
-  await stmt(
-    bindings,
-    "INSERT INTO audit_logs(id,actor_id,action,entity_type,entity_id,created_at) VALUES(?,?,'company_verified','company',?,?)",
-    id(),
-    owner.id,
-    cid,
-    now(),
-  ).run();
-  const report = await bug(reporter.cookie, {
-    category: "security",
-    companyId: cid,
-  });
-  expect(
-    (await request(`/bugs/${report.id}`, "GET", undefined, owner.cookie))
-      .status,
-  ).toBe(200);
-  await applyD1Migrations(base.DB, base.MIGRATIONS.slice(6));
-  expect(
-    (await request(`/bugs/${report.id}`, "GET", undefined, owner.cookie))
-      .status,
-  ).toBe(404);
-  expect(
-    (await request(`/bugs/${report.id}`, "GET", undefined, invited.cookie))
-      .status,
-  ).toBe(404);
-  expect(
+test.each([true, false])(
+  "upgrade revokes prior owners and invites regardless of claim audit presence (%s)",
+  async (hasAudit) => {
+    await reset();
+    await applyD1Migrations(base.DB, base.MIGRATIONS.slice(0, 6));
+    const owner = await user("owner@acme.example"),
+      invited = await user("invited@acme.example"),
+      reporter = await user();
+    const cid = await company(owner, "acme.example");
     await stmt(
       bindings,
-      "SELECT count(*) n FROM company_members WHERE company_id=?",
+      "INSERT INTO company_members(id,company_id,user_id,role,created_at) VALUES(?,?,?,'member',?)",
+      id(),
       cid,
-    ).first("n"),
+      invited.id,
+      now(),
+    ).run();
+    if (hasAudit)
+      await stmt(
+        bindings,
+        "INSERT INTO audit_logs(id,actor_id,action,entity_type,entity_id,created_at) VALUES(?,?,'company_verified','company',?,?)",
+        id(),
+        owner.id,
+        cid,
+        now(),
+      ).run();
+    const report = await bug(reporter.cookie, {
+      category: "security",
+      companyId: cid,
+    });
+    expect(
+      (await request(`/bugs/${report.id}`, "GET", undefined, owner.cookie))
+        .status,
+    ).toBe(200);
+    await applyD1Migrations(base.DB, base.MIGRATIONS.slice(6));
+    expect(
+      (await request(`/bugs/${report.id}`, "GET", undefined, owner.cookie))
+        .status,
+    ).toBe(404);
+    expect(
+      (await request(`/bugs/${report.id}`, "GET", undefined, invited.cookie))
+        .status,
+    ).toBe(404);
+    expect(
+      await stmt(
+        bindings,
+        "SELECT count(*) n FROM company_members WHERE company_id=?",
+        cid,
+      ).first("n"),
+    ).toBe(0);
+    expect(
+      await stmt(
+        bindings,
+        "SELECT is_verified FROM companies WHERE id=?",
+        cid,
+      ).first("is_verified"),
+    ).toBe(0);
+    expect(
+      await stmt(
+        bindings,
+        "SELECT status FROM company_claims WHERE company_id=? AND user_id=?",
+        cid,
+        owner.id,
+      ).first("status"),
+    ).toBe("pending");
+  },
+);
+
+test("upgrade clears dormant memberships and verified flags even without an eligible former administrator", async () => {
+  await reset();
+  await applyD1Migrations(base.DB, base.MIGRATIONS.slice(0, 6));
+  const former = await user("former@different.example");
+  const dormant = await company(former, "dormant.example");
+  await stmt(
+    bindings,
+    "UPDATE companies SET is_verified=0 WHERE id=?",
+    dormant,
+  ).run();
+  for (const domain of ["member-only.example", "ownerless.example"]) {
+    const cid = id();
+    await stmt(
+      bindings,
+      "INSERT INTO companies(id,name,domain,is_verified,created_at,updated_at) VALUES(?,?,?,1,?,?)",
+      cid,
+      domain,
+      domain,
+      now(),
+      now(),
+    ).run();
+    if (domain === "member-only.example")
+      await stmt(
+        bindings,
+        "INSERT INTO company_members(id,company_id,user_id,role,created_at) VALUES(?,?,?,'member',?)",
+        id(),
+        cid,
+        former.id,
+        now(),
+      ).run();
+  }
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM audit_logs").first("n"),
+  ).toBe(0);
+  await applyD1Migrations(base.DB, base.MIGRATIONS.slice(6));
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM company_members").first("n"),
   ).toBe(0);
   expect(
     await stmt(
       bindings,
-      "SELECT status FROM company_claims WHERE company_id=? AND user_id=?",
-      cid,
-      owner.id,
-    ).first("status"),
-  ).toBe("pending");
+      "SELECT count(*) n FROM companies WHERE is_verified=1",
+    ).first("n"),
+  ).toBe(0);
+  expect(
+    await stmt(bindings, "SELECT count(*) n FROM company_claims").first("n"),
+  ).toBe(0);
+  expect(
+    await stmt(
+      bindings,
+      "SELECT count(*) n FROM audit_logs WHERE action='company_authorization_review_required'",
+    ).first("n"),
+  ).toBe(3);
 });
 
 test("revoking the reviewer session after dispatch but before the batch prevents all approval side effects", async () => {
